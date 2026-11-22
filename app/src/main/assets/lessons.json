@@ -1,0 +1,480 @@
+{
+  "lessons": [
+    {
+      "id": "sample-prepositions-time",
+      "title": "Prepositions of Time: in, on, at",
+      "level": "A1",
+      "topic": "Grammar",
+      "content": "We use IN, ON and AT to say when something happens.\n\nAT is for exact times and some expressions:\n• at 7 o'clock, at midnight, at noon\n• at the weekend (British English), at night, at Christmas\n\nON is for days and dates:\n• on Monday, on Friday morning\n• on 25 December, on my birthday\n\nIN is for longer periods:\n• in the morning / afternoon / evening\n• in July, in winter, in 2024\n• in the 21st century\n\nTip: small → AT (a time), medium → ON (a day), big → IN (months, years, seasons).",
+      "questions": [
+        {
+          "id": "pt1",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "The film starts ___ 8 o'clock.",
+          "options": [
+            "in",
+            "on",
+            "at"
+          ],
+          "correctIndex": 2,
+          "explanation": "Use AT for exact clock times."
+        },
+        {
+          "id": "pt2",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "My birthday is ___ June.",
+          "options": [
+            "in",
+            "on",
+            "at"
+          ],
+          "correctIndex": 0,
+          "explanation": "Use IN for months."
+        },
+        {
+          "id": "pt3",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "We have English ___ Tuesday.",
+          "options": [
+            "in",
+            "on",
+            "at"
+          ],
+          "correctIndex": 1,
+          "explanation": "Use ON for days of the week."
+        },
+        {
+          "id": "pt4",
+          "type": "FILL_BLANK",
+          "prompt": "I usually read a book ___ the evening.",
+          "acceptedAnswers": [
+            "in"
+          ],
+          "explanation": "In the morning / afternoon / evening."
+        },
+        {
+          "id": "pt5",
+          "type": "FILL_BLANK",
+          "prompt": "The shops are closed ___ Christmas Day.",
+          "acceptedAnswers": [
+            "on"
+          ],
+          "explanation": "Christmas DAY is a specific day, so ON. (But: at Christmas = the holiday period.)"
+        },
+        {
+          "id": "pt6",
+          "type": "TRUE_FALSE",
+          "prompt": "“In 1998” is correct.",
+          "correctIndex": 0,
+          "explanation": "Use IN for years."
+        },
+        {
+          "id": "pt7",
+          "type": "TRUE_FALSE",
+          "prompt": "“On night” is correct.",
+          "correctIndex": 1,
+          "explanation": "We say AT night."
+        }
+      ]
+    },
+    {
+      "id": "sample-present-simple-continuous",
+      "title": "Present Simple vs Present Continuous",
+      "level": "A2",
+      "topic": "Grammar",
+      "content": "PRESENT SIMPLE (I work, she works)\nUse it for habits, routines and facts.\n• I get up at 7 every day.\n• Water boils at 100°C.\n• She doesn't like coffee.\nSignal words: always, usually, often, sometimes, never, every day.\nRemember: he/she/it + -s → he plays, she watches, it goes.\n\nPRESENT CONTINUOUS (I am working, she is working)\nUse it for actions happening now or around now, and temporary situations.\n• Look! It's raining.\n• I'm studying for my exams this week.\n• They aren't watching TV at the moment.\nSignal words: now, right now, at the moment, look!, listen!, today, this week.\n\nStative verbs (like, love, know, want, believe, understand) are not usually used in the continuous form:\n✓ I know the answer.  ✗ I am knowing the answer.",
+      "questions": [
+        {
+          "id": "ps1",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "Listen! The baby ___.",
+          "options": [
+            "cries",
+            "is crying",
+            "cry"
+          ],
+          "correctIndex": 1,
+          "explanation": "“Listen!” shows it is happening now → present continuous."
+        },
+        {
+          "id": "ps2",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "My father ___ to work by bus every day.",
+          "options": [
+            "goes",
+            "is going",
+            "go"
+          ],
+          "correctIndex": 0,
+          "explanation": "“Every day” is a routine → present simple, he + goes."
+        },
+        {
+          "id": "ps3",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "I ___ what you mean.",
+          "options": [
+            "am understanding",
+            "understands",
+            "understand"
+          ],
+          "correctIndex": 2,
+          "explanation": "“Understand” is a stative verb, so present simple."
+        },
+        {
+          "id": "ps4",
+          "type": "FILL_BLANK",
+          "prompt": "She ___ (not / like) spicy food.",
+          "acceptedAnswers": [
+            "doesn't like",
+            "does not like"
+          ],
+          "explanation": "Negative present simple with she: doesn't + base verb."
+        },
+        {
+          "id": "ps5",
+          "type": "FILL_BLANK",
+          "prompt": "Please be quiet. I ___ (study) right now.",
+          "acceptedAnswers": [
+            "am studying",
+            "'m studying",
+            "i am studying",
+            "i'm studying"
+          ],
+          "explanation": "“Right now” → am + -ing."
+        },
+        {
+          "id": "ps6",
+          "type": "TRUE_FALSE",
+          "prompt": "“Water is boiling at 100°C” is the best way to state this scientific fact.",
+          "correctIndex": 1,
+          "explanation": "Facts use the present simple: Water boils at 100°C."
+        },
+        {
+          "id": "ps7",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "What ___ this weekend?",
+          "options": [
+            "do you do",
+            "are you doing",
+            "you are doing"
+          ],
+          "correctIndex": 1,
+          "explanation": "Plans and arrangements for the near future often use the present continuous."
+        }
+      ]
+    },
+    {
+      "id": "sample-past-simple",
+      "title": "Past Simple: Regular and Irregular Verbs",
+      "level": "A2",
+      "topic": "Grammar",
+      "content": "We use the PAST SIMPLE for finished actions in the past, often with a time: yesterday, last week, in 2010, two days ago.\n\nRegular verbs add -ed:\n• work → worked, play → played\n• live → lived (verb ends in -e: add -d)\n• stop → stopped (short verb: double the consonant)\n• study → studied (consonant + y → -ied)\n\nIrregular verbs have special forms you must learn:\n• go → went, have → had, see → saw, buy → bought\n• eat → ate, take → took, write → wrote, be → was/were\n\nNegatives and questions use DID + base verb:\n• I didn't go to school yesterday. (NOT: I didn't went)\n• Did you see the match?",
+      "questions": [
+        {
+          "id": "pa1",
+          "type": "FILL_BLANK",
+          "prompt": "Yesterday I ___ (go) to the cinema with my friends.",
+          "acceptedAnswers": [
+            "went"
+          ],
+          "explanation": "Go is irregular: go → went."
+        },
+        {
+          "id": "pa2",
+          "type": "FILL_BLANK",
+          "prompt": "They ___ (study) all night for the test.",
+          "acceptedAnswers": [
+            "studied"
+          ],
+          "explanation": "Consonant + y → -ied."
+        },
+        {
+          "id": "pa3",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "We ___ a great film last night.",
+          "options": [
+            "see",
+            "saw",
+            "seen"
+          ],
+          "correctIndex": 1,
+          "explanation": "See → saw (past simple). “Seen” is the past participle."
+        },
+        {
+          "id": "pa4",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "She didn't ___ breakfast this morning.",
+          "options": [
+            "ate",
+            "eaten",
+            "eat"
+          ],
+          "correctIndex": 2,
+          "explanation": "After didn't use the base verb."
+        },
+        {
+          "id": "pa5",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "___ you buy a new phone last week?",
+          "options": [
+            "Do",
+            "Did",
+            "Were"
+          ],
+          "correctIndex": 1,
+          "explanation": "Questions in the past simple use Did + base verb."
+        },
+        {
+          "id": "pa6",
+          "type": "TRUE_FALSE",
+          "prompt": "The past simple of “stop” is “stoped”.",
+          "correctIndex": 1,
+          "explanation": "Double the consonant: stopped."
+        },
+        {
+          "id": "pa7",
+          "type": "FILL_BLANK",
+          "prompt": "My grandmother ___ (write) me a letter last month.",
+          "acceptedAnswers": [
+            "wrote"
+          ],
+          "explanation": "Write → wrote."
+        }
+      ]
+    },
+    {
+      "id": "sample-comparatives",
+      "title": "Comparatives and Superlatives",
+      "level": "A2–B1",
+      "topic": "Grammar",
+      "content": "Use COMPARATIVES to compare two things, and SUPERLATIVES to say something is the most in a group.\n\nShort adjectives (one syllable): add -er / -est\n• tall → taller → the tallest\n• big → bigger → the biggest (double the consonant)\n\nAdjectives ending in -y: change y to -ier / -iest\n• happy → happier → the happiest\n\nLong adjectives (two or more syllables): more / the most\n• expensive → more expensive → the most expensive\n• interesting → more interesting → the most interesting\n\nIrregular:\n• good → better → the best\n• bad → worse → the worst\n• far → further/farther → the furthest/farthest\n\nUse THAN after a comparative: My brother is taller than me.\nUse THE before a superlative: It's the best day of my life.",
+      "questions": [
+        {
+          "id": "co1",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "An elephant is ___ than a horse.",
+          "options": [
+            "big",
+            "bigger",
+            "biggest"
+          ],
+          "correctIndex": 1,
+          "explanation": "Comparing two things → comparative; double the g."
+        },
+        {
+          "id": "co2",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "This is ___ book I have ever read.",
+          "options": [
+            "the most interesting",
+            "more interesting",
+            "the interestingest"
+          ],
+          "correctIndex": 0,
+          "explanation": "Long adjective + superlative → the most …"
+        },
+        {
+          "id": "co3",
+          "type": "FILL_BLANK",
+          "prompt": "Today is ___ (good) than yesterday.",
+          "acceptedAnswers": [
+            "better"
+          ],
+          "explanation": "Good → better → the best."
+        },
+        {
+          "id": "co4",
+          "type": "FILL_BLANK",
+          "prompt": "She is the ___ (happy) person I know.",
+          "acceptedAnswers": [
+            "happiest"
+          ],
+          "explanation": "Happy → happiest (y → iest)."
+        },
+        {
+          "id": "co5",
+          "type": "TRUE_FALSE",
+          "prompt": "“More cheap” is the correct comparative of “cheap”.",
+          "correctIndex": 1,
+          "explanation": "Cheap is one syllable: cheaper."
+        },
+        {
+          "id": "co6",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "My test result was ___ than yours.",
+          "options": [
+            "badder",
+            "worse",
+            "worst"
+          ],
+          "correctIndex": 1,
+          "explanation": "Bad → worse → the worst."
+        }
+      ]
+    },
+    {
+      "id": "sample-reading-market",
+      "title": "Reading: A Saturday at the Market",
+      "level": "A2",
+      "topic": "Reading comprehension",
+      "content": "Every Saturday morning, Amina goes to the market with her grandfather. They leave the house at half past seven because the best fruit is sold early.\n\nHer grandfather always buys the same things: oranges, fresh bread and a small bag of olives. Amina likes to look at the colourful spices, but she doesn't like the fish section because of the smell.\n\nLast Saturday was different. It was raining heavily, so there were not many people at the market. The orange seller, Mr Karim, was happy to see them. He gave Amina a free apple and told her a funny story about his donkey.\n\nOn the way home, Amina's grandfather said, “Rainy days are the best days for the market. The sellers have more time to talk.” Amina agreed. She thinks the market is more interesting than the supermarket because every visit is a little adventure.",
+      "questions": [
+        {
+          "id": "rm1",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "Why do Amina and her grandfather leave early?",
+          "options": [
+            "Because the market closes at 8",
+            "Because the best fruit is sold early",
+            "Because it is raining"
+          ],
+          "correctIndex": 1,
+          "explanation": "“They leave … because the best fruit is sold early.”"
+        },
+        {
+          "id": "rm2",
+          "type": "TRUE_FALSE",
+          "prompt": "Amina enjoys the fish section.",
+          "correctIndex": 1,
+          "explanation": "She doesn't like the fish section because of the smell."
+        },
+        {
+          "id": "rm3",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "What did Mr Karim give Amina?",
+          "options": [
+            "An orange",
+            "Some olives",
+            "An apple"
+          ],
+          "correctIndex": 2,
+          "explanation": "“He gave Amina a free apple.”"
+        },
+        {
+          "id": "rm4",
+          "type": "FILL_BLANK",
+          "prompt": "Last Saturday there were not many people because it was ___.",
+          "acceptedAnswers": [
+            "raining",
+            "rainy",
+            "raining heavily"
+          ],
+          "explanation": "“It was raining heavily, so there were not many people.”"
+        },
+        {
+          "id": "rm5",
+          "type": "TRUE_FALSE",
+          "prompt": "Amina's grandfather thinks rainy days are good for the market.",
+          "correctIndex": 0,
+          "explanation": "“Rainy days are the best days for the market.”"
+        },
+        {
+          "id": "rm6",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "Why does Amina prefer the market to the supermarket?",
+          "options": [
+            "It is cheaper",
+            "Every visit is a little adventure",
+            "It is closer to her house"
+          ],
+          "correctIndex": 1,
+          "explanation": "Last sentence of the text."
+        },
+        {
+          "id": "rm7",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "In the text, the word “heavily” means…",
+          "options": [
+            "a lot / strongly",
+            "slowly",
+            "quietly"
+          ],
+          "correctIndex": 0,
+          "explanation": "Raining heavily = raining a lot."
+        }
+      ]
+    },
+    {
+      "id": "sample-phrasal-verbs",
+      "title": "Everyday Phrasal Verbs",
+      "level": "B1",
+      "topic": "Vocabulary",
+      "content": "A phrasal verb is a verb + a small word (up, on, after, out…). The meaning is often different from the verb alone.\n\n• look after = take care of — She looks after her little brother.\n• look for = try to find — I'm looking for my keys.\n• give up = stop doing something — He gave up smoking last year.\n• get up = leave your bed — I get up at 6:30.\n• turn on / turn off = start / stop a machine — Turn off the lights, please.\n• find out = discover information — I found out the truth.\n• run out of = have no more — We've run out of milk.\n• put on = dress yourself in — Put on your coat; it's cold.",
+      "questions": [
+        {
+          "id": "pv1",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "Can you ___ my cat while I'm on holiday?",
+          "options": [
+            "look for",
+            "look after",
+            "look out"
+          ],
+          "correctIndex": 1,
+          "explanation": "Look after = take care of."
+        },
+        {
+          "id": "pv2",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "I can't find my phone. Can you help me ___ it?",
+          "options": [
+            "look for",
+            "give up",
+            "turn off"
+          ],
+          "correctIndex": 0,
+          "explanation": "Look for = try to find."
+        },
+        {
+          "id": "pv3",
+          "type": "FILL_BLANK",
+          "prompt": "Don't ___ up! You can do it.",
+          "acceptedAnswers": [
+            "give"
+          ],
+          "explanation": "Give up = stop trying."
+        },
+        {
+          "id": "pv4",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "We've run ___ of sugar. Can you buy some?",
+          "options": [
+            "off",
+            "out",
+            "up"
+          ],
+          "correctIndex": 1,
+          "explanation": "Run out of = have no more."
+        },
+        {
+          "id": "pv5",
+          "type": "TRUE_FALSE",
+          "prompt": "“Find out” means “to discover information”.",
+          "correctIndex": 0,
+          "explanation": ""
+        },
+        {
+          "id": "pv6",
+          "type": "MULTIPLE_CHOICE",
+          "prompt": "It's cold. ___ your jacket.",
+          "options": [
+            "Put on",
+            "Turn on",
+            "Get up"
+          ],
+          "correctIndex": 0,
+          "explanation": "Put on = dress yourself in clothes."
+        },
+        {
+          "id": "pv7",
+          "type": "FILL_BLANK",
+          "prompt": "Please turn ___ the TV before you go to bed.",
+          "acceptedAnswers": [
+            "off"
+          ],
+          "explanation": "Turn off = stop a machine."
+        }
+      ]
+    }
+  ]
+}
