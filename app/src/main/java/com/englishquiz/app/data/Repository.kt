@@ -9,28 +9,25 @@ import java.util.Locale
 
 class Repository(private val context: Context) {
 
-    private val lessonsFile = File(context.filesDir, "lessons.json")
+    private val unitsFile = File(context.filesDir, "units.json")
     private val resultsFile = File(context.filesDir, "results.json")
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
-    // ---------- Lessons ----------
+    // ---------- Units ----------
 
-    fun loadLessons(): List<Lesson> {
-        if (!lessonsFile.exists()) {
-            val samples = loadSampleLessons()
-            saveLessons(samples)
-            return samples
+    fun loadUnits(): List<StudyUnit> {
+        if (!unitsFile.exists()) {
+            val builtIn = loadBuiltInUnits()
+            saveUnits(builtIn)
+            return builtIn
         }
-        return runCatching { json.decodeFromString<LessonsFile>(lessonsFile.readText()).lessons }
-            .getOrElse { loadSampleLessons() }
+        return runCatching { parseUnits(unitsFile.readText()) }.getOrElse { loadBuiltInUnits() }
     }
 
-    fun saveLessons(lessons: List<Lesson>) = writeAtomic(lessonsFile, json.encodeToString(LessonsFile.serializer(), LessonsFile(lessons)))
+    fun saveUnits(units: List<StudyUnit>) = writeAtomic(unitsFile, unitsToJson(units))
 
-    fun loadSampleLessons(): List<Lesson> =
-        parseLessons(context.assets.open("lessons.json").bufferedReader().use { it.readText() })
-
-    fun lessonsToJson(lessons: List<Lesson>): String = json.encodeToString(LessonsFile.serializer(), LessonsFile(lessons))
+    fun loadBuiltInUnits(): List<StudyUnit> =
+        parseUnits(context.assets.open("units.json").bufferedReader().use { it.readText() })
 
     // ---------- Results ----------
 
@@ -50,9 +47,9 @@ class Repository(private val context: Context) {
         get() = prefs.getBoolean("instant_feedback", false)
         set(value) = prefs.edit().putBoolean("instant_feedback", value).apply()
 
-    var shuffleQuestions: Boolean
-        get() = prefs.getBoolean("shuffle", true)
-        set(value) = prefs.edit().putBoolean("shuffle", value).apply()
+    var questionsPerTest: Int
+        get() = prefs.getInt("questions_per_test", DEFAULT_QUESTIONS)
+        set(value) = prefs.edit().putInt("questions_per_test", value).apply()
 
     private fun writeAtomic(file: File, text: String) {
         val tmp = File(file.parentFile, file.name + ".tmp")
@@ -65,6 +62,8 @@ class Repository(private val context: Context) {
 
     companion object {
         const val DEFAULT_PIN = "1234"
+        const val DEFAULT_QUESTIONS = 10
+        val QUESTION_COUNT_CHOICES = listOf(5, 10, 15, 20)
 
         val json = Json {
             ignoreUnknownKeys = true
@@ -73,19 +72,23 @@ class Repository(private val context: Context) {
             coerceInputValues = true
         }
 
-        /** Accepts either {"lessons":[...]} or a bare [...] array. */
-        fun parseLessons(text: String): List<Lesson> {
+        fun unitsToJson(units: List<StudyUnit>): String = json.encodeToString(UnitsFile.serializer(), UnitsFile(units))
+
+        /** Accepts either {"units":[...]} or a bare [...] array. */
+        fun parseUnits(text: String): List<StudyUnit> {
             val trimmed = text.trim()
-            return if (trimmed.startsWith("[")) json.decodeFromString<List<Lesson>>(trimmed)
-            else json.decodeFromString<LessonsFile>(trimmed).lessons
+            return if (trimmed.startsWith("[")) json.decodeFromString<List<StudyUnit>>(trimmed)
+            else json.decodeFromString<UnitsFile>(trimmed).units
         }
 
         fun resultsToCsv(results: List<QuizResult>): String {
             val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
-            val sb = StringBuilder("Student,Lesson,Date,Score,Total,Percent\n")
+            val sb = StringBuilder("Student,Unit,Focus,Level,Date,Score,Total,Percent\n")
             results.sortedBy { it.timestamp }.forEach { r ->
                 sb.append(csv(r.studentName)).append(',')
-                    .append(csv(r.lessonTitle)).append(',')
+                    .append(csv(r.unitTitle)).append(',')
+                    .append(r.focusLabel).append(',')
+                    .append(r.difficulty.label).append(',')
                     .append(fmt.format(Date(r.timestamp))).append(',')
                     .append(r.score).append(',')
                     .append(r.total).append(',')

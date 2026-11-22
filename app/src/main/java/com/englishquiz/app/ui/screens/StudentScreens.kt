@@ -39,6 +39,13 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.sp
+import com.englishquiz.app.data.Difficulty
+import com.englishquiz.app.data.Skill
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -73,7 +80,7 @@ fun HomeScreen(vm: AppViewModel) {
             Text("Welcome!", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Read a lesson, then answer the questions to check what you understood.",
+                "Choose a unit, pick your level, review the lesson, then test yourself.",
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodyLarge,
             )
@@ -84,12 +91,12 @@ fun HomeScreen(vm: AppViewModel) {
                 label = { Text("Your name") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Go),
-                keyboardActions = KeyboardActions(onGo = { if (canStart) vm.navigate(Screen.Lessons) }),
+                keyboardActions = KeyboardActions(onGo = { if (canStart) vm.navigate(Screen.Units) }),
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(16.dp))
             Button(
-                onClick = { vm.navigate(Screen.Lessons) },
+                onClick = { vm.navigate(Screen.Units) },
                 enabled = canStart,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) { Text("Start") }
@@ -102,10 +109,10 @@ fun HomeScreen(vm: AppViewModel) {
 }
 
 @Composable
-fun LessonListScreen(vm: AppViewModel) {
+fun UnitListScreen(vm: AppViewModel) {
     AppScaffold(vm, title = "Hi, ${vm.studentName.trim()}") { pad ->
-        if (vm.lessons.isEmpty()) {
-            Centered(pad) { Text("No lessons yet. Ask your teacher to add some.") }
+        if (vm.units.isEmpty()) {
+            Centered(pad) { Text("No units yet. Ask your teacher to add some.") }
             return@AppScaffold
         }
         LazyColumn(
@@ -113,26 +120,34 @@ fun LessonListScreen(vm: AppViewModel) {
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { Text("Choose a lesson", style = MaterialTheme.typography.titleMedium) }
-            items(vm.lessons, key = { it.id }) { lesson ->
-                val best = vm.bestPercent(lesson.id)
-                Card(Modifier.fillMaxWidth().clickable { vm.navigate(Screen.LessonDetail(lesson.id)) }) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(lesson.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.height(4.dp))
-                        val meta = listOfNotNull(
-                            lesson.level.takeIf { it.isNotBlank() },
-                            lesson.topic.takeIf { it.isNotBlank() },
-                            "${lesson.questions.size} questions",
-                        ).joinToString(" · ")
-                        Text(meta, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (best != null) {
-                            Spacer(Modifier.height(6.dp))
+            item { Text("Choose a unit", style = MaterialTheme.typography.titleMedium) }
+            items(vm.units, key = { it.id }) { unit ->
+                val best = vm.bestPercent(unit.id)
+                Card(Modifier.fillMaxWidth().clickable { vm.navigate(Screen.UnitSetup(unit.id)) }) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (unit.number > 0) {
+                            Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primary) {
+                                Text(
+                                    unit.number.toString(), color = MaterialTheme.colorScheme.onPrimary,
+                                    style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.width(48.dp).padding(vertical = 10.dp),
+                                )
+                            }
+                            Spacer(Modifier.width(14.dp))
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text(unit.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Text(
-                                "Your best: $best%",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = if (best >= 50) CorrectGreen else WrongRed,
+                                Skill.entries.filter { unit.section(it).questions.isNotEmpty() }.joinToString(" · ") { it.label },
+                                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                            if (best != null) {
+                                Text(
+                                    "Your best: $best%", style = MaterialTheme.typography.labelLarge,
+                                    color = if (best >= 50) CorrectGreen else WrongRed,
+                                )
+                            }
                         }
                     }
                 }
@@ -150,38 +165,126 @@ internal fun Centered(pad: androidx.compose.foundation.layout.PaddingValues, con
 }
 
 @Composable
-fun LessonDetailScreen(vm: AppViewModel, lessonId: String) {
-    val lesson = vm.lessonById(lessonId)
+private fun ChoiceCard(
+    selected: Boolean,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+    title: String,
+    subtitle: String,
+    leading: String? = null,
+) {
+    OutlinedCard(
+        border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else CardDefaults.outlinedCardBorder(enabled),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surface,
+        ),
+        modifier = Modifier.fillMaxWidth().selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick),
+    ) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(selected = selected, onClick = null, enabled = enabled)
+            Spacer(Modifier.width(8.dp))
+            if (leading != null) { Text(leading, fontSize = 24.sp); Spacer(Modifier.width(10.dp)) }
+            Column(Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.SemiBold, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+fun UnitSetupScreen(vm: AppViewModel, unitId: String) {
+    val unit = vm.unitById(unitId)
+    var difficulty by remember { mutableStateOf(vm.lastDifficulty) }
+    var skill by remember { mutableStateOf(vm.lastSkill) }
+    val available = unit?.questionCount(skill, difficulty) ?: 0
     AppScaffold(
-        vm, title = lesson?.title ?: "Lesson",
+        vm, title = unit?.let { if (it.number > 0) "Unit ${it.number}" else it.title } ?: "Unit",
         bottomBar = {
-            if (lesson != null) {
+            if (unit != null) {
                 Surface(tonalElevation = 3.dp) {
                     Button(
-                        onClick = { vm.startQuiz(lesson) },
-                        enabled = lesson.questions.isNotEmpty(),
+                        onClick = {
+                            vm.lastDifficulty = difficulty; vm.lastSkill = skill
+                            vm.navigate(Screen.Lesson(unit.id, skill, difficulty))
+                        },
+                        enabled = available > 0,
                         modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp).height(52.dp),
-                    ) { Text("Start the quiz (${lesson.questions.size} questions)") }
+                    ) { Text("Next: read the lesson") }
                 }
             }
         },
     ) { pad ->
-        if (lesson == null) { Centered(pad) { Text("This lesson no longer exists.") }; return@AppScaffold }
-        Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
-            Text(lesson.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            if (lesson.level.isNotBlank() || lesson.topic.isNotBlank()) {
-                Text(
-                    listOf(lesson.level, lesson.topic).filter { it.isNotBlank() }.joinToString(" · "),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
+        if (unit == null) { Centered(pad) { Text("This unit no longer exists.") }; return@AppScaffold }
+        Column(
+            Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(unit.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("1. How hard should the questions be?", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+            Difficulty.entries.forEach { d ->
+                ChoiceCard(
+                    selected = difficulty == d, onClick = { difficulty = d },
+                    title = d.label, subtitle = d.description,
+                    leading = when (d) { Difficulty.EASY -> "🟢"; Difficulty.MEDIUM -> "🟠"; Difficulty.HARD -> "🔴" },
                 )
             }
-            Spacer(Modifier.height(16.dp))
-            Text(
-                lesson.content.ifBlank { "This lesson has no reading text. Go straight to the quiz." },
-                style = MaterialTheme.typography.bodyLarge,
-                lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.15f,
+            Text("2. What do you want to practise?", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp))
+            Skill.entries.forEach { sk ->
+                val n = unit.questionCount(sk, difficulty)
+                ChoiceCard(
+                    selected = skill == sk, enabled = n > 0, onClick = { skill = sk },
+                    title = sk.label + unit.section(sk).title.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty(),
+                    subtitle = if (n > 0) "${minOf(n, vm.questionsPerTest)} random questions" else "No questions at this level yet",
+                    leading = sk.icon,
+                )
+            }
+            val nAll = unit.questionCount(null, difficulty)
+            ChoiceCard(
+                selected = skill == null, enabled = nAll > 0, onClick = { skill = null },
+                title = "Everything (mixed)", subtitle = "${minOf(nAll, vm.questionsPerTest)} random questions from vocabulary, grammar and functions",
+                leading = "🔀",
             )
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+fun LessonScreen(vm: AppViewModel, s: Screen.Lesson) {
+    val unit = vm.unitById(s.unitId)
+    val n = minOf(unit?.questionCount(s.skill, s.difficulty) ?: 0, vm.questionsPerTest)
+    AppScaffold(
+        vm, title = "Lesson: " + (s.skill?.label ?: "the whole unit"),
+        bottomBar = {
+            if (unit != null) {
+                Surface(tonalElevation = 3.dp) {
+                    Button(
+                        onClick = { vm.startQuiz(unit, s.skill, s.difficulty) },
+                        enabled = n > 0,
+                        modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp).height(52.dp),
+                    ) { Text("Start the test ($n questions · ${s.difficulty.label})") }
+                }
+            }
+        },
+    ) { pad ->
+        if (unit == null) { Centered(pad) { Text("This unit no longer exists.") }; return@AppScaffold }
+        Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
+            Text(unit.displayTitle, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            val sections = unit.sections.filter { (s.skill == null || it.skill == s.skill) && it.content.isNotBlank() }
+            if (sections.isEmpty()) Text("There is no lesson text for this part. You can start the test.")
+            sections.forEach { sec ->
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "${sec.skill.icon} ${sec.skill.label}" + sec.title.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty(),
+                    style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(4.dp))
+                LessonText(sec.content)
+                Spacer(Modifier.height(12.dp))
+                androidx.compose.material3.HorizontalDivider()
+            }
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
@@ -195,7 +298,7 @@ fun QuizScreen(vm: AppViewModel, onQuit: () -> Unit) {
     val locked = fb != null
 
     AppScaffold(
-        vm, title = q.lesson.title, onBack = onQuit,
+        vm, title = q.unit.displayTitle, onBack = onQuit,
         bottomBar = {
             Surface(tonalElevation = 3.dp) {
                 val label = when {
@@ -224,15 +327,19 @@ fun QuizScreen(vm: AppViewModel, onQuit: () -> Unit) {
             )
             Spacer(Modifier.height(20.dp))
             Text(
-                when (item.question.type) {
+                "${item.skill.icon} ${item.skill.label} · " + when (item.question.type) {
                     QuestionType.TRUE_FALSE -> "True or false?"
-                    QuestionType.FILL_BLANK -> "Fill in the blank"
+                    QuestionType.FILL_BLANK -> "Write the answer"
                     QuestionType.MULTIPLE_CHOICE -> "Choose the best answer"
                 },
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(8.dp))
+            if (!item.question.image.isNullOrBlank()) {
+                QuestionImage(item.question.image)
+                Spacer(Modifier.height(12.dp))
+            }
             Text(item.question.prompt, style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(20.dp))
 
@@ -318,7 +425,8 @@ fun ResultScreen(vm: AppViewModel, resultId: String, fromTeacher: Boolean) {
         ) {
             item {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(r.lessonTitle, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                    Text(r.unitTitle, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                    Text("${r.focusLabel} · ${r.difficulty.label}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                     Text("${r.studentName} · ${formatDate(r.timestamp)}", style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(12.dp))
                     Text(
@@ -342,11 +450,11 @@ fun ResultScreen(vm: AppViewModel, resultId: String, fromTeacher: Boolean) {
                         Spacer(Modifier.height(16.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             OutlinedButton(onClick = {
-                                vm.goHome(); vm.navigate(Screen.Lessons)
-                            }) { Text("All lessons") }
+                                vm.goHome(); vm.navigate(Screen.Units)
+                            }) { Text("All units") }
                             Button(onClick = {
-                                vm.lessonById(r.lessonId)?.let { lesson -> vm.back(); vm.startQuiz(lesson) }
-                            }, enabled = vm.lessonById(r.lessonId) != null) { Text("Try again") }
+                                vm.unitById(r.unitId)?.let { unit -> vm.back(); vm.startQuiz(unit, r.skill, r.difficulty) }
+                            }, enabled = vm.unitById(r.unitId) != null) { Text("New test") }
                         }
                     }
                     Spacer(Modifier.height(8.dp))

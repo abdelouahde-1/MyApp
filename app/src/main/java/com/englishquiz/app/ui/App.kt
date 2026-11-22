@@ -11,13 +11,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.englishquiz.app.ui.screens.HomeScreen
-import com.englishquiz.app.ui.screens.LessonDetailScreen
-import com.englishquiz.app.ui.screens.LessonEditorScreen
-import com.englishquiz.app.ui.screens.LessonListScreen
+import com.englishquiz.app.ui.screens.LessonScreen
+import com.englishquiz.app.ui.screens.UnitSetupScreen
+import com.englishquiz.app.ui.screens.UnitEditorScreen
+import com.englishquiz.app.ui.screens.UnitListScreen
 import com.englishquiz.app.ui.screens.QuizScreen
 import com.englishquiz.app.ui.screens.ResultScreen
 import com.englishquiz.app.ui.screens.TeacherHomeScreen
-import com.englishquiz.app.ui.screens.TeacherLessonsScreen
+import com.englishquiz.app.ui.screens.TeacherUnitsScreen
 import com.englishquiz.app.ui.screens.TeacherLoginScreen
 import com.englishquiz.app.ui.screens.TeacherResultsScreen
 import com.englishquiz.app.ui.screens.TeacherSettingsScreen
@@ -32,15 +33,16 @@ fun App(vm: AppViewModel = viewModel()) {
 
     when (val s = vm.screen) {
         Screen.Home -> HomeScreen(vm)
-        Screen.Lessons -> LessonListScreen(vm)
-        is Screen.LessonDetail -> LessonDetailScreen(vm, s.lessonId)
+        Screen.Units -> UnitListScreen(vm)
+        is Screen.UnitSetup -> UnitSetupScreen(vm, s.unitId)
+        is Screen.Lesson -> LessonScreen(vm, s)
         Screen.Quiz -> QuizScreen(vm, onQuit = { confirmQuit = true })
         is Screen.Result -> ResultScreen(vm, s.resultId, s.fromTeacher)
         Screen.TeacherLogin -> TeacherLoginScreen(vm)
         Screen.TeacherHome -> TeacherHomeScreen(vm)
         Screen.TeacherResults -> TeacherResultsScreen(vm)
-        Screen.TeacherLessons -> TeacherLessonsScreen(vm)
-        is Screen.LessonEditor -> LessonEditorScreen(vm, s.lessonId)
+        Screen.TeacherUnits -> TeacherUnitsScreen(vm)
+        is Screen.UnitEditor -> UnitEditorScreen(vm, s.unitId)
         Screen.TeacherSettings -> TeacherSettingsScreen(vm)
     }
 

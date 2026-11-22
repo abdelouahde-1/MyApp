@@ -1,5 +1,8 @@
 package com.englishquiz.app.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,7 +15,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -21,7 +25,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,6 +32,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,50 +44,77 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.englishquiz.app.data.AnswerChecker
-import com.englishquiz.app.data.Lesson
+import com.englishquiz.app.data.Difficulty
 import com.englishquiz.app.data.Question
 import com.englishquiz.app.data.QuestionType
+import com.englishquiz.app.data.Section
+import com.englishquiz.app.data.Skill
+import com.englishquiz.app.data.StudyUnit
 import com.englishquiz.app.data.Validation
 import com.englishquiz.app.ui.AppViewModel
 
 private const val MAX_OPTIONS = 6
 
 @Composable
-fun LessonEditorScreen(vm: AppViewModel, lessonId: String?) {
-    val original = remember(lessonId) { lessonId?.let { vm.lessonById(it) } }
-    var lesson by remember(lessonId) { mutableStateOf(original ?: Lesson()) }
+fun UnitEditorScreen(vm: AppViewModel, unitId: String?) {
+    val original = remember(unitId) { unitId?.let { vm.unitById(it) } }
+    var unit by remember(unitId) {
+        mutableStateOf((original ?: StudyUnit()).let { u -> u.copy(sections = Skill.entries.map { u.section(it) }) })
+    }
+    val initial = remember(unitId) { unit }
     // Raw text for fill-in-the-blank answers, keyed by question id, so typing "|" is not disrupted.
-    val rawAccepted = remember(lessonId) {
+    val rawAccepted = remember(unitId) {
         mutableStateMapOf<String, String>().apply {
-            lesson.questions.forEach { put(it.id, it.acceptedAnswers.joinToString(" | ")) }
+            unit.sections.flatMap { it.questions }.forEach { put(it.id, it.acceptedAnswers.joinToString(" | ")) }
         }
     }
+    var tab by remember { mutableStateOf(0) }
+    var levelFilter by remember { mutableStateOf<Difficulty?>(null) }
     var problems by remember { mutableStateOf<List<String>>(emptyList()) }
     var confirmDiscard by remember { mutableStateOf(false) }
+    var numberText by remember(unitId) { mutableStateOf(if (unit.number > 0) unit.number.toString() else "") }
 
-    fun build(): Lesson = lesson.copy(questions = lesson.questions.map { q ->
-        if (q.type == QuestionType.FILL_BLANK) q.copy(acceptedAnswers = AnswerChecker.splitAccepted(rawAccepted[q.id].orEmpty()), options = emptyList())
-        else if (q.type == QuestionType.TRUE_FALSE) q.copy(options = emptyList(), acceptedAnswers = emptyList())
-        else q.copy(options = q.options.map { it.trim() }, acceptedAnswers = emptyList())
-    }, title = lesson.title.trim())
+    val skill = Skill.entries[tab]
+    val section = unit.section(skill)
 
-    fun updateQ(i: Int, f: (Question) -> Question) {
-        lesson = lesson.copy(questions = lesson.questions.toMutableList().also { it[i] = f(it[i]) })
+    fun build(): StudyUnit = unit.copy(
+        title = unit.title.trim(),
+        number = numberText.toIntOrNull() ?: 0,
+        sections = unit.sections.map { s ->
+            s.copy(questions = s.questions.map { q ->
+                when (q.type) {
+                    QuestionType.FILL_BLANK -> q.copy(acceptedAnswers = AnswerChecker.splitAccepted(rawAccepted[q.id].orEmpty()), options = emptyList())
+                    QuestionType.TRUE_FALSE -> q.copy(options = emptyList(), acceptedAnswers = emptyList())
+                    QuestionType.MULTIPLE_CHOICE -> q.copy(options = q.options.map { it.trim() }, acceptedAnswers = emptyList())
+                }.let { if (it.image.isNullOrBlank()) it.copy(image = null) else it }
+            })
+        },
+    )
+
+    fun updateSection(f: (Section) -> Section) {
+        unit = unit.copy(sections = unit.sections.map { if (it.skill == skill) f(it) else it })
     }
+
+    fun updateQ(id: String, f: (Question) -> Question) =
+        updateSection { s -> s.copy(questions = s.questions.map { if (it.id == id) f(it) else it }) }
 
     val save = {
         val built = build()
         val p = Validation.problems(built)
-        if (p.isEmpty()) { vm.saveLesson(built); vm.message = "Lesson saved."; vm.back() } else problems = p
+        if (p.isEmpty()) { vm.saveUnit(built); vm.message = "Unit saved."; vm.back() } else problems = p
     }
+
+    val visible = section.questions.filter { levelFilter == null || it.difficulty == levelFilter }
 
     AppScaffold(
         vm,
-        title = if (original == null) "New lesson" else "Edit lesson",
-        onBack = { if (build() != (original ?: Lesson(id = lesson.id))) confirmDiscard = true else vm.back() },
+        title = if (original == null) "New unit" else "Edit unit",
+        onBack = { if (build() != initial.copy(number = initial.number)) confirmDiscard = true else vm.back() },
         actions = { TextButton(onClick = save) { Text("SAVE") } },
     ) { pad ->
         LazyColumn(
@@ -91,50 +123,75 @@ fun LessonEditorScreen(vm: AppViewModel, lessonId: String?) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(lesson.title, { lesson = lesson.copy(title = it) }, label = { Text("Lesson title *") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(lesson.level, { lesson = lesson.copy(level = it) }, label = { Text("Level (e.g. A2)") }, singleLine = true, modifier = Modifier.weight(1f))
-                        OutlinedTextField(lesson.topic, { lesson = lesson.copy(topic = it) }, label = { Text("Topic") }, singleLine = true, modifier = Modifier.weight(1f))
-                    }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        lesson.content, { lesson = lesson.copy(content = it) },
-                        label = { Text("Lesson text (what students read first)") },
-                        minLines = 5, modifier = Modifier.fillMaxWidth(),
+                        numberText, { numberText = it.filter(Char::isDigit).take(3) }, label = { Text("Unit no.") }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.width(96.dp),
                     )
-                    Text("Questions (${lesson.questions.size})", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+                    OutlinedTextField(unit.title, { unit = unit.copy(title = it) }, label = { Text("Unit title *") }, singleLine = true, modifier = Modifier.weight(1f))
                 }
             }
-            itemsIndexed(lesson.questions, key = { _, q -> q.id }) { i, q ->
+            item {
+                TabRow(selectedTabIndex = tab) {
+                    Skill.entries.forEachIndexed { i, sk ->
+                        Tab(selected = tab == i, onClick = { tab = i }, text = { Text("${sk.label} (${unit.section(sk).questions.size})") })
+                    }
+                }
+            }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        section.title, { v -> updateSection { it.copy(title = v) } },
+                        label = { Text("${skill.label} topic (e.g. Gerund & Infinitive)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        section.content, { v -> updateSection { it.copy(content = v) } },
+                        label = { Text("Lesson students read before the test") },
+                        supportingText = { Text("Tip: start a line with \"# \" for a heading, \"• \" for a bullet, and wrap words in **stars** for bold.") },
+                        minLines = 5, modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text("Questions", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip(selected = levelFilter == null, onClick = { levelFilter = null }, label = { Text("All ${section.questions.size}") })
+                        Difficulty.entries.forEach { d ->
+                            FilterChip(
+                                selected = levelFilter == d, onClick = { levelFilter = d },
+                                label = { Text("${d.label} ${section.questions.count { it.difficulty == d }}") },
+                            )
+                        }
+                    }
+                }
+            }
+            items(visible, key = { it.id }) { q ->
+                val pos = section.questions.indexOfFirst { it.id == q.id }
                 QuestionEditor(
-                    number = i + 1,
+                    number = pos + 1,
                     q = q,
                     rawAccepted = rawAccepted[q.id].orEmpty(),
                     onRawAccepted = { rawAccepted[q.id] = it },
-                    onChange = { nq -> updateQ(i) { nq } },
-                    onDelete = { lesson = lesson.copy(questions = lesson.questions.filterIndexed { j, _ -> j != i }) },
+                    onChange = { nq -> updateQ(q.id) { nq } },
+                    onDelete = { updateSection { s -> s.copy(questions = s.questions.filterNot { it.id == q.id }) } },
                     onMove = { dir ->
-                        val j = i + dir
-                        if (j in lesson.questions.indices) {
-                            val list = lesson.questions.toMutableList()
-                            list[i] = list[j].also { list[j] = list[i] }
-                            lesson = lesson.copy(questions = list)
+                        updateSection { s ->
+                            val list = s.questions.toMutableList()
+                            val i = list.indexOfFirst { it.id == q.id }
+                            val j = i + dir
+                            if (i >= 0 && j in list.indices) list[i] = list[j].also { list[j] = list[i] }
+                            s.copy(questions = list)
                         }
                     },
-                    isFirst = i == 0, isLast = i == lesson.questions.lastIndex,
+                    isFirst = pos == 0, isLast = pos == section.questions.lastIndex,
                 )
             }
             item {
+                val d = levelFilter ?: Difficulty.MEDIUM
+                fun add(q: Question) { updateSection { it.copy(questions = it.questions + q.copy(difficulty = d)) } }
+                Text("Add a ${d.label.lowercase()} question:", style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    AddButton("Multiple choice", Modifier.weight(1f)) {
-                        lesson = lesson.copy(questions = lesson.questions + Question(type = QuestionType.MULTIPLE_CHOICE, options = List(4) { "" }))
-                    }
-                    AddButton("True / False", Modifier.weight(1f)) {
-                        lesson = lesson.copy(questions = lesson.questions + Question(type = QuestionType.TRUE_FALSE))
-                    }
-                    AddButton("Fill blank", Modifier.weight(1f)) {
-                        lesson = lesson.copy(questions = lesson.questions + Question(type = QuestionType.FILL_BLANK))
-                    }
+                    AddButton("Choice", Modifier.weight(1f)) { add(Question(type = QuestionType.MULTIPLE_CHOICE, options = List(3) { "" })) }
+                    AddButton("True/False", Modifier.weight(1f)) { add(Question(type = QuestionType.TRUE_FALSE)) }
+                    AddButton("Write", Modifier.weight(1f)) { add(Question(type = QuestionType.FILL_BLANK)) }
                 }
                 Spacer(Modifier.height(48.dp))
             }
@@ -150,7 +207,7 @@ fun LessonEditorScreen(vm: AppViewModel, lessonId: String?) {
         )
     }
     if (confirmDiscard) ConfirmDialog(
-        "Discard changes?", "Your changes to this lesson have not been saved.", confirmLabel = "Discard",
+        "Discard changes?", "Your changes to this unit have not been saved.", confirmLabel = "Discard",
         onConfirm = { confirmDiscard = false; vm.back() }, onDismiss = { confirmDiscard = false },
     )
 }
@@ -163,7 +220,6 @@ private fun AddButton(label: String, modifier: Modifier, onClick: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun QuestionEditor(
     number: Int,
@@ -176,6 +232,10 @@ private fun QuestionEditor(
     isFirst: Boolean,
     isLast: Boolean,
 ) {
+    val ctx = LocalContext.current
+    val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) encodeImageAsDataUri(ctx, uri)?.let { onChange(q.copy(image = it)) }
+    }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -185,13 +245,18 @@ private fun QuestionEditor(
                 IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = "Delete question") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(QuestionType.MULTIPLE_CHOICE to "Choice", QuestionType.TRUE_FALSE to "True/False", QuestionType.FILL_BLANK to "Fill blank").forEach { (t, label) ->
+                Difficulty.entries.forEach { d ->
+                    FilterChip(selected = q.difficulty == d, onClick = { onChange(q.copy(difficulty = d)) }, label = { Text(d.label) })
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(QuestionType.MULTIPLE_CHOICE to "Choice", QuestionType.TRUE_FALSE to "True/False", QuestionType.FILL_BLANK to "Write").forEach { (t, label) ->
                     FilterChip(
                         selected = q.type == t,
                         onClick = {
                             if (q.type != t) onChange(
                                 when (t) {
-                                    QuestionType.MULTIPLE_CHOICE -> q.copy(type = t, options = q.options.ifEmpty { List(4) { "" } }, correctIndex = 0)
+                                    QuestionType.MULTIPLE_CHOICE -> q.copy(type = t, options = q.options.ifEmpty { List(3) { "" } }, correctIndex = 0)
                                     QuestionType.TRUE_FALSE -> q.copy(type = t, correctIndex = 0)
                                     QuestionType.FILL_BLANK -> q.copy(type = t)
                                 }
@@ -206,6 +271,22 @@ private fun QuestionEditor(
                 label = { Text(if (q.type == QuestionType.FILL_BLANK) "Sentence with a blank, e.g. She ___ (go) home." else "Question") },
                 modifier = Modifier.fillMaxWidth(),
             )
+            // Picture
+            if (q.image?.startsWith("data:") == true) {
+                QuestionImage(q.image, size = 120.dp)
+                TextButton(onClick = { onChange(q.copy(image = null)) }) { Text("Remove picture") }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        q.image.orEmpty(), { onChange(q.copy(image = it.take(8))) },
+                        label = { Text("Picture: emoji") }, singleLine = true, modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    OutlinedButton(onClick = {
+                        pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }) { Text("Add photo") }
+                }
+            }
             when (q.type) {
                 QuestionType.MULTIPLE_CHOICE -> {
                     Text("Options — tap the circle next to the correct one", style = MaterialTheme.typography.labelMedium)

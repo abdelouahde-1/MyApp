@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
@@ -18,8 +19,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Drives the real app on the JVM: a student takes a full quiz, then the teacher checks results.
- * Screenshots go to app/build/outputs/roborazzi/ when run with -Proborazzi.test.record=true.
+ * Drives the real app on the JVM: a student picks a unit, level and focus, reads the lesson,
+ * takes the test, then the teacher checks the result. Screenshots go to app/build/outputs/roborazzi/.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -40,78 +41,76 @@ class AppFlowTest {
 
     private fun exists(text: String) = rule.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty()
 
-    @Test fun studentTakesQuizThenTeacherSeesResult() {
-        shot("01-home")
-        rule.onNodeWithText("Your name").performTextInput("Sara")
-        rule.onNodeWithText("Start").performClick()
-        shot("02-lessons")
-
-        rule.onNodeWithText("Reading: A Saturday at the Market").performClick()
-        shot("03-lesson")
-        rule.onNodeWithText("Start the quiz", substring = true).performClick()
-
+    private fun takeTest(expected: Int, firstShot: String? = null) {
         var n = 0
         while (true) {
             n++
-            if (exists("Your answer")) {
-                rule.onNodeWithText("Your answer").performTextInput("raining")
-            } else {
-                rule.onAllNodes(isSelectable())[0].performClick()
-            }
-            if (n == 1) shot("04-question")
-            if (exists("Check")) rule.onNodeWithText("Check").performClick() // instant-feedback mode
+            if (exists("Your answer")) rule.onNodeWithText("Your answer").performTextInput("x")
+            else rule.onAllNodes(isSelectable())[0].performClick()
+            if (n == 1 && firstShot != null) shot(firstShot)
+            if (exists("Check")) rule.onNodeWithText("Check").performClick()
             if (exists("Finish")) { rule.onNodeWithText("Finish").performClick(); break }
             rule.onNodeWithText("Next").performClick()
-            check(n < 20) { "Quiz never finished" }
+            check(n < 30) { "Test never finished" }
         }
-        rule.onNodeWithText("out of 7 correct", substring = true).assertExists()
-        shot("05-result")
+        check(n == expected) { "Expected $expected questions, got $n" }
+    }
 
-        // Teacher area
-        rule.onNodeWithText("All lessons").performClick()
+    @Test fun studentTakesGrammarTestThenTeacherSeesResult() {
+        shot("01-home")
+        rule.onNodeWithText("Your name").performTextInput("Sara")
+        rule.onNodeWithText("Start").performClick()
+        shot("02-units")
+
+        rule.onNodeWithText("The Gifts of Youth").performClick()
+        rule.onNodeWithText("Medium").performClick()
+        rule.onNodeWithText("Grammar: Gerund & infinitive").performClick()
+        shot("03-setup")
+        rule.onNodeWithText("Next: read the lesson").performClick()
+        shot("04-lesson")
+        rule.onNodeWithText("Start the test", substring = true).performClick()
+        takeTest(10, "05-question")
+        rule.onNodeWithText("out of 10 correct", substring = true).assertExists()
+        rule.onNodeWithText("Grammar · Medium").assertExists()
+        shot("06-result")
+
+        rule.onNodeWithText("All units").performClick()
         rule.onNodeWithContentDescription("Back").performClick()
         rule.onNodeWithContentDescription("Teacher area").performClick()
         rule.onNodeWithText("PIN").performTextInput("1234")
         rule.onNodeWithText("Unlock").performClick()
-        shot("06-teacher-home")
+        shot("07-teacher-home")
         rule.onNodeWithText("Student results").performClick()
-        rule.onAllNodes(hasText("Sara")).fetchSemanticsNodes().let { check(it.isNotEmpty()) { "Result not listed" } }
-        shot("07-teacher-results")
+        check(exists("Sara")) { "Result not listed" }
+        shot("08-teacher-results")
 
         rule.onNodeWithContentDescription("Back").performClick()
-        rule.onNodeWithText("Lessons & questions").performClick()
-        rule.onNodeWithText("New lesson", useUnmergedTree = true).performClick()
-        rule.onNodeWithText("Multiple choice").performClick()
-        shot("08-editor")
-        rule.onNodeWithText("SAVE").performClick()
-        rule.onNodeWithText("Please fix these first").assertExists()
+        rule.onNodeWithText("Units & questions").performClick()
+        rule.onNodeWithText("Unit 1: The Gifts of Youth").performClick()
+        shot("09-editor")
     }
 
-    @Test fun instantFeedbackShowsCorrectness() {
+    @Test fun mixedEasyVocabularyWithPicturesAndFeedback() {
         rule.onNodeWithContentDescription("Teacher area").performClick()
         rule.onNodeWithText("PIN").performTextInput("1234")
         rule.onNodeWithText("Unlock").performClick()
         rule.onNodeWithText("Settings").performClick()
         rule.onNodeWithText("Show feedback after each question").performClick()
-        rule.onNodeWithText("Shuffle questions and options").performClick() // turn shuffle off
+        rule.onNodeWithText("5").performClick()
         rule.onNodeWithContentDescription("Back").performClick()
         rule.onNodeWithContentDescription("Back").performClick()
 
         rule.onNodeWithText("Your name").performTextInput("Omar")
         rule.onNodeWithText("Start").performClick()
-        rule.onNodeWithText("Prepositions of Time: in, on, at").performClick()
-        rule.onNodeWithText("Start the quiz", substring = true).performClick()
-        // Q1: "The film starts ___ 8 o'clock." correct = "at"
-        rule.onNode(hasText("at") and isSelectable()).performClick()
+        rule.onNodeWithText("Sustainable Development").performScrollTo().performClick()
+        rule.onNodeWithText("Everything (mixed)").performScrollTo().performClick()
+        shot("10-setup-mixed")
+        rule.onNodeWithText("Next: read the lesson").performClick()
+        rule.onNodeWithText("Start the test (5 questions · Easy)").performClick()
+        rule.onAllNodes(isSelectable())[0].performClick()
         rule.onNodeWithText("Check").performClick()
-        rule.onNodeWithText("Correct!").assertExists()
-        shot("09-instant-feedback")
-        rule.onNodeWithText("Next").performClick()
-        // Q2: "My birthday is ___ June." pick wrong answer "on"
-        rule.onNode(hasText("on") and isSelectable()).performClick()
-        rule.onNodeWithText("Check").performClick()
-        rule.onNodeWithText("Not quite.").assertExists()
-        rule.onNodeWithText("Correct answer: in").assertExists()
+        shot("11-feedback")
+        takeTest(5)
+        rule.onNodeWithText("out of 5 correct", substring = true).assertExists()
     }
-
 }

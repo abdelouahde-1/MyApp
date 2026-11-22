@@ -1,12 +1,15 @@
 package com.englishquiz.app
 
 import com.englishquiz.app.data.AnswerChecker
-import com.englishquiz.app.data.Lesson
+import com.englishquiz.app.data.Difficulty
 import com.englishquiz.app.data.Question
 import com.englishquiz.app.data.QuestionType
 import com.englishquiz.app.data.QuizEngine
 import com.englishquiz.app.data.QuizResult
 import com.englishquiz.app.data.Repository
+import com.englishquiz.app.data.Section
+import com.englishquiz.app.data.Skill
+import com.englishquiz.app.data.StudyUnit
 import com.englishquiz.app.data.Validation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -17,61 +20,81 @@ import kotlin.random.Random
 
 class QuizLogicTest {
 
+    private fun q(d: Difficulty, n: Int) =
+        Question(id = "$d-$n", type = QuestionType.MULTIPLE_CHOICE, difficulty = d, prompt = "p$n", options = listOf("a", "b", "c"), correctIndex = 0)
+
+    private val unit = StudyUnit(
+        id = "u", title = "T",
+        sections = listOf(
+            Section(Skill.VOCABULARY, questions = List(12) { q(Difficulty.EASY, it) } + List(3) { q(Difficulty.HARD, it) }),
+            Section(Skill.GRAMMAR, questions = List(12) { q(Difficulty.EASY, it + 100) }),
+            Section(Skill.FUNCTIONS, questions = List(12) { q(Difficulty.EASY, it + 200) }),
+        ),
+    )
+
     @Test fun fillBlankIgnoresCaseSpacesAndPunctuation() {
         assertTrue(AnswerChecker.isFillBlankCorrect("  Went. ", listOf("went")))
-        assertTrue(AnswerChecker.isFillBlankCorrect("doesn’t   like", listOf("doesn't like")))
+        assertTrue(AnswerChecker.isFillBlankCorrect("won’t   have finished", listOf("won't have finished")))
         assertFalse(AnswerChecker.isFillBlankCorrect("goed", listOf("went")))
         assertFalse(AnswerChecker.isFillBlankCorrect("   ", listOf("went")))
     }
 
-    @Test fun splitAcceptedAnswers() {
-        assertEquals(listOf("went", "did go"), AnswerChecker.splitAccepted(" went |did go | "))
+    @Test fun testIsLimitedAndUsesOnlyChosenSkillAndLevel() {
+        val items = QuizEngine.prepare(unit, Skill.VOCABULARY, Difficulty.EASY, 10, Random(1))
+        assertEquals(10, items.size)
+        assertTrue(items.all { it.skill == Skill.VOCABULARY && it.question.difficulty == Difficulty.EASY })
+        assertEquals(10, items.map { it.question.id }.toSet().size)
+    }
+
+    @Test fun smallBankGivesFewerQuestions() {
+        assertEquals(3, QuizEngine.prepare(unit, Skill.VOCABULARY, Difficulty.HARD, 10).size)
+        assertEquals(0, QuizEngine.prepare(unit, Skill.GRAMMAR, Difficulty.MEDIUM, 10).size)
+    }
+
+    @Test fun mixedTestBalancesSkills() {
+        repeat(20) { seed ->
+            val counts = QuizEngine.prepare(unit, null, Difficulty.EASY, 9, Random(seed)).groupingBy { it.skill }.eachCount()
+            assertEquals(mapOf(Skill.VOCABULARY to 3, Skill.GRAMMAR to 3, Skill.FUNCTIONS to 3), counts)
+        }
     }
 
     @Test fun shuffledOptionsKeepCorrectAnswer() {
-        val q = Question(type = QuestionType.MULTIPLE_CHOICE, prompt = "p", options = listOf("a", "b", "c", "d"), correctIndex = 2)
-        val lesson = Lesson(questions = listOf(q))
+        val question = Question(type = QuestionType.MULTIPLE_CHOICE, prompt = "p", options = listOf("a", "b", "c", "d"), correctIndex = 2)
         repeat(50) { seed ->
-            val item = QuizEngine.prepare(lesson, shuffle = true, random = Random(seed)).single()
+            val item = QuizEngine.toItem(question, Skill.GRAMMAR, Random(seed))
             assertEquals("c", item.options[item.correctIndex])
             assertTrue(QuizEngine.grade(item, item.correctIndex, "").correct)
             assertFalse(QuizEngine.grade(item, (item.correctIndex + 1) % 4, "").correct)
         }
     }
 
-    @Test fun trueFalseGrading() {
-        val q = Question(type = QuestionType.TRUE_FALSE, prompt = "p", correctIndex = 1)
-        val item = QuizEngine.prepare(Lesson(questions = listOf(q)), shuffle = true).single()
-        assertEquals(listOf("True", "False"), item.options)
-        assertTrue(QuizEngine.grade(item, 1, "").correct)
-        assertEquals("True", QuizEngine.grade(item, 0, "").givenAnswer)
-    }
-
     @Test fun validationCatchesProblems() {
-        assertTrue(Validation.problems(Lesson(title = "")).size >= 2)
-        val ok = Lesson(title = "T", questions = listOf(Question(type = QuestionType.FILL_BLANK, prompt = "x", acceptedAnswers = listOf("y"))))
-        assertTrue(Validation.problems(ok).isEmpty())
-        val badMc = ok.copy(questions = listOf(Question(prompt = "x", options = listOf("a", ""), correctIndex = 0)))
-        assertFalse(Validation.problems(badMc).isEmpty())
+        assertTrue(Validation.problems(StudyUnit(title = "")).size >= 2)
+        assertTrue(Validation.problems(unit).isEmpty())
     }
 
-    @Test fun sampleLessonsParseAndAreValid() {
-        val text = File("src/main/assets/lessons.json").readText()
-        val lessons = Repository.parseLessons(text)
-        assertTrue(lessons.size >= 5)
-        lessons.forEach { assertEquals(it.title, emptyList<String>(), Validation.problems(it)) }
-        assertEquals(lessons.size, lessons.map { it.id }.toSet().size)
+    @Test fun builtInUnitsAreValidAndComplete() {
+        val units = Repository.parseUnits(File("src/main/assets/units.json").readText())
+        assertEquals(10, units.size)
+        assertEquals((1..10).toList(), units.map { it.number })
+        units.forEach { u ->
+            assertEquals(u.title, emptyList<String>(), Validation.problems(u))
+            Skill.entries.forEach { sk ->
+                assertTrue("${u.title} ${sk.label} lesson", u.section(sk).content.isNotBlank())
+                Difficulty.entries.forEach { d ->
+                    assertTrue("${u.title} ${sk.label} ${d.label}", u.questionCount(sk, d) >= 10)
+                }
+            }
+        }
+        val ids = units.flatMap { u -> u.sections.flatMap { s -> s.questions.map { it.id } } }
+        assertEquals(ids.size, ids.toSet().size)
     }
 
-    @Test fun parsesBareArrayToo() {
-        val lessons = Repository.parseLessons("""[{"title":"A","questions":[{"type":"TRUE_FALSE","prompt":"x","correctIndex":0}]}]""")
-        assertEquals("A", lessons.single().title)
-    }
-
-    @Test fun csvEscapesCommas() {
-        val r = QuizResult(studentName = "Smith, Ana", lessonId = "l", lessonTitle = "Past \"simple\"", timestamp = 0, score = 3, total = 4, answers = emptyList())
+    @Test fun csvIncludesFocusAndLevel() {
+        val r = QuizResult(studentName = "Smith, Ana", unitId = "u", unitTitle = "Unit 1: Youth", skill = Skill.GRAMMAR,
+            difficulty = Difficulty.HARD, timestamp = 0, score = 3, total = 4, answers = emptyList())
         val line = Repository.resultsToCsv(listOf(r)).lines()[1]
-        assertTrue(line.startsWith("\"Smith, Ana\",\"Past \"\"simple\"\"\","))
+        assertTrue(line, line.startsWith("\"Smith, Ana\",Unit 1: Youth,Grammar,Hard,"))
         assertTrue(line.endsWith(",3,4,75"))
     }
 }

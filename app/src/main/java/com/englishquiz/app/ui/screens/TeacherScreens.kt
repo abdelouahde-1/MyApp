@@ -121,8 +121,8 @@ fun TeacherHomeScreen(vm: AppViewModel) {
                 StatCard("Average", avg?.let { "$it%" } ?: "—", Modifier.weight(1f))
             }
             MenuCard(Icons.Filled.Person, "Student results", "See scores, review answers, export to CSV") { vm.navigate(Screen.TeacherResults) }
-            MenuCard(Icons.AutoMirrored.Filled.List, "Lessons & questions", "${vm.lessons.size} lessons · create, edit, import, export") { vm.navigate(Screen.TeacherLessons) }
-            MenuCard(Icons.Filled.Settings, "Settings", "PIN, feedback mode, shuffling") { vm.navigate(Screen.TeacherSettings) }
+            MenuCard(Icons.AutoMirrored.Filled.List, "Units & questions", "${vm.units.size} units · ${vm.units.sumOf { it.totalQuestions }} questions · edit, import, export") { vm.navigate(Screen.TeacherUnits) }
+            MenuCard(Icons.Filled.Settings, "Settings", "PIN, feedback mode, questions per test") { vm.navigate(Screen.TeacherSettings) }
         }
     }
 }
@@ -161,7 +161,7 @@ fun TeacherResultsScreen(vm: AppViewModel) {
     }
 
     val filtered = vm.results
-        .filter { query.isBlank() || it.studentName.contains(query.trim(), true) || it.lessonTitle.contains(query.trim(), true) }
+        .filter { query.isBlank() || it.studentName.contains(query.trim(), true) || it.unitTitle.contains(query.trim(), true) }
         .sortedByDescending { it.timestamp }
 
     AppScaffold(
@@ -178,20 +178,22 @@ fun TeacherResultsScreen(vm: AppViewModel) {
             item {
                 OutlinedTextField(
                     value = query, onValueChange = { query = it },
-                    label = { Text("Search by student or lesson") }, singleLine = true,
+                    label = { Text("Search by student or unit") }, singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
             if (vm.results.isNotEmpty()) {
-                item { Text("By lesson", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
-                val byLesson = vm.results.groupBy { it.lessonTitle }.toSortedMap()
-                items(byLesson.entries.toList(), key = { "sum-" + it.key }) { (title, rs) ->
+                item { Text("By unit", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
+                val byUnit = vm.results.groupBy { it.unitTitle }.toSortedMap()
+                items(byUnit.entries.toList(), key = { "sum-" + it.key }) { (title, rs) ->
                     val avg = rs.map { it.percent }.average().toInt()
                     Card(Modifier.fillMaxWidth()) {
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(title, fontWeight = FontWeight.SemiBold)
                                 Text("${rs.size} attempt(s) · ${rs.map { it.studentName.lowercase() }.distinct().size} student(s)", style = MaterialTheme.typography.bodySmall)
+                                val bySkill = rs.groupBy { it.focusLabel }.entries.joinToString("  ") { (k, v) -> "$k ${v.map { it.percent }.average().toInt()}%" }
+                                Text(bySkill, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Text("$avg%", style = MaterialTheme.typography.titleLarge, color = if (avg >= 50) CorrectGreen else WrongRed)
                         }
@@ -206,7 +208,7 @@ fun TeacherResultsScreen(vm: AppViewModel) {
                 Card(Modifier.fillMaxWidth().clickable { vm.navigate(Screen.Result(r.id, fromTeacher = true)) }) {
                     ListItem(
                         headlineContent = { Text(r.studentName, fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("${r.lessonTitle}\n${formatDate(r.timestamp)}") },
+                        supportingContent = { Text("${r.unitTitle}\n${r.focusLabel} · ${r.difficulty.label} · ${formatDate(r.timestamp)}") },
                         trailingContent = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("${r.score}/${r.total}", color = if (r.percent >= 50) CorrectGreen else WrongRed, fontWeight = FontWeight.Bold)
@@ -222,7 +224,7 @@ fun TeacherResultsScreen(vm: AppViewModel) {
     if (confirmClear) ConfirmDialog("Delete all results?", "This cannot be undone. Export to CSV first if you want a copy.",
         onConfirm = { vm.clearResults(); confirmClear = false }, onDismiss = { confirmClear = false })
     toDelete?.let { r ->
-        ConfirmDialog("Delete this result?", "${r.studentName} — ${r.lessonTitle}",
+        ConfirmDialog("Delete this result?", "${r.studentName} — ${r.unitTitle}",
             onConfirm = { vm.deleteResult(r.id); toDelete = null }, onDismiss = { toDelete = null })
     }
 }
@@ -239,50 +241,52 @@ fun ConfirmDialog(title: String, text: String, confirmLabel: String = "Delete", 
 }
 
 @Composable
-fun TeacherLessonsScreen(vm: AppViewModel) {
+fun TeacherUnitsScreen(vm: AppViewModel) {
     val ctx = LocalContext.current
     var menu by remember { mutableStateOf(false) }
-    var toDelete by remember { mutableStateOf<com.englishquiz.app.data.Lesson?>(null) }
+    var toDelete by remember { mutableStateOf<com.englishquiz.app.data.StudyUnit?>(null) }
 
     val importJson = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val text = readText(ctx, uri)
-            if (text == null) vm.message = "Could not open that file." else vm.importLessons(text)
+            if (text == null) vm.message = "Could not open that file." else vm.importUnits(text)
         }
     }
     val exportJson = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        if (uri != null) vm.message = if (writeText(ctx, uri, vm.lessonsJson())) "Lessons exported." else "Export failed."
+        if (uri != null) vm.message = if (writeText(ctx, uri, vm.unitsJson())) "Units exported." else "Export failed."
     }
 
     AppScaffold(
-        vm, title = "Lessons",
+        vm, title = "Units",
         actions = {
             IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "More") }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(text = { Text("Import lessons (JSON)") }, onClick = { menu = false; importJson.launch(arrayOf("application/json", "text/plain", "*/*")) })
-                DropdownMenuItem(text = { Text("Export lessons (JSON)") }, onClick = { menu = false; exportJson.launch("lessons.json") })
-                DropdownMenuItem(text = { Text("Restore sample lessons") }, onClick = { menu = false; vm.restoreSampleLessons() })
+                DropdownMenuItem(text = { Text("Import units (JSON)") }, onClick = { menu = false; importJson.launch(arrayOf("application/json", "text/plain", "*/*")) })
+                DropdownMenuItem(text = { Text("Export units (JSON)") }, onClick = { menu = false; exportJson.launch("units.json") })
+                DropdownMenuItem(text = { Text("Restore built-in units") }, onClick = { menu = false; vm.restoreBuiltInUnits() })
             }
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { vm.navigate(Screen.LessonEditor(null)) },
+                onClick = { vm.navigate(Screen.UnitEditor(null)) },
                 icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("New lesson") },
+                text = { Text("New unit") },
             )
         },
     ) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize(), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 96.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (vm.lessons.isEmpty()) item { Text("No lessons. Tap “New lesson” or import a file.") }
-            items(vm.lessons, key = { it.id }) { l ->
-                Card(Modifier.fillMaxWidth().clickable { vm.navigate(Screen.LessonEditor(l.id)) }) {
+            if (vm.units.isEmpty()) item { Text("No units. Tap “New unit” or import a file.") }
+            items(vm.units, key = { it.id }) { u ->
+                Card(Modifier.fillMaxWidth().clickable { vm.navigate(Screen.UnitEditor(u.id)) }) {
                     ListItem(
-                        headlineContent = { Text(l.title.ifBlank { "(untitled)" }, fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text(listOf(l.level, "${l.questions.size} questions").filter { it.isNotBlank() }.joinToString(" · ")) },
+                        headlineContent = { Text(u.displayTitle.ifBlank { "(untitled)" }, fontWeight = FontWeight.SemiBold) },
+                        supportingContent = {
+                            Text(com.englishquiz.app.data.Skill.entries.joinToString(" · ") { sk -> "${sk.label} ${u.section(sk).questions.size}" })
+                        },
                         trailingContent = {
                             Row {
-                                IconButton(onClick = { vm.navigate(Screen.LessonEditor(l.id)) }) { Icon(Icons.Filled.Edit, contentDescription = "Edit") }
-                                IconButton(onClick = { toDelete = l }) { Icon(Icons.Filled.Delete, contentDescription = "Delete") }
+                                IconButton(onClick = { vm.navigate(Screen.UnitEditor(u.id)) }) { Icon(Icons.Filled.Edit, contentDescription = "Edit") }
+                                IconButton(onClick = { toDelete = u }) { Icon(Icons.Filled.Delete, contentDescription = "Delete") }
                             }
                         },
                     )
@@ -290,9 +294,9 @@ fun TeacherLessonsScreen(vm: AppViewModel) {
             }
         }
     }
-    toDelete?.let { l ->
-        ConfirmDialog("Delete “${l.title}”?", "Students' past results for this lesson are kept.",
-            onConfirm = { vm.deleteLesson(l.id); toDelete = null }, onDismiss = { toDelete = null })
+    toDelete?.let { u ->
+        ConfirmDialog("Delete “${u.displayTitle}”?", "Students' past results for this unit are kept.",
+            onConfirm = { vm.deleteUnit(u.id); toDelete = null }, onDismiss = { toDelete = null })
     }
 }
 
@@ -308,11 +312,17 @@ fun TeacherSettingsScreen(vm: AppViewModel) {
                 vm.instantFeedback, vm::updateInstantFeedback,
             )
             HorizontalDivider()
-            SwitchRow(
-                "Shuffle questions and options",
-                "Each attempt shows questions and multiple-choice options in a random order.",
-                vm.shuffleQuestions, vm::updateShuffle,
-            )
+            Spacer(Modifier.height(12.dp))
+            Text("Questions per test", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text("Each test picks this many random questions (fewer if the bank is smaller).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+                Repository.QUESTION_COUNT_CHOICES.forEach { n ->
+                    androidx.compose.material3.FilterChip(
+                        selected = vm.questionsPerTest == n, onClick = { vm.updateQuestionsPerTest(n) },
+                        label = { Text(n.toString()) },
+                    )
+                }
+            }
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
             Text("Change teacher PIN", style = MaterialTheme.typography.titleMedium)
@@ -332,13 +342,13 @@ fun TeacherSettingsScreen(vm: AppViewModel) {
             }
             Spacer(Modifier.height(24.dp))
             OutlinedButton(onClick = { confirmRestore = true }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Star, contentDescription = null); Spacer(Modifier.width(8.dp)); Text("Restore sample lessons")
+                Icon(Icons.Filled.Star, contentDescription = null); Spacer(Modifier.width(8.dp)); Text("Restore built-in units")
             }
         }
     }
     if (confirmRestore) ConfirmDialog(
-        "Restore sample lessons?", "The built-in lessons are added back. If you edited one of them, your edits are replaced. Your own lessons are not touched.",
-        confirmLabel = "Restore", onConfirm = { vm.restoreSampleLessons(); confirmRestore = false }, onDismiss = { confirmRestore = false },
+        "Restore built-in units?", "The built-in units are added back. If you edited one of them, your edits are replaced. Units you created are not touched.",
+        confirmLabel = "Restore", onConfirm = { vm.restoreBuiltInUnits(); confirmRestore = false }, onDismiss = { confirmRestore = false },
     )
 }
 

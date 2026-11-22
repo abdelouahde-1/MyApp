@@ -8,27 +8,37 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import com.englishquiz.app.data.AnswerRecord
-import com.englishquiz.app.data.Lesson
+import com.englishquiz.app.data.Difficulty
 import com.englishquiz.app.data.QuizEngine
 import com.englishquiz.app.data.QuizItem
 import com.englishquiz.app.data.QuizResult
 import com.englishquiz.app.data.Repository
+import com.englishquiz.app.data.Skill
+import com.englishquiz.app.data.StudyUnit
 
 sealed interface Screen {
     data object Home : Screen
-    data object Lessons : Screen
-    data class LessonDetail(val lessonId: String) : Screen
+    data object Units : Screen
+    data class UnitSetup(val unitId: String) : Screen
+    /** [skill] null = all three parts (mixed test). */
+    data class Lesson(val unitId: String, val skill: Skill?, val difficulty: Difficulty) : Screen
     data object Quiz : Screen
     data class Result(val resultId: String, val fromTeacher: Boolean = false) : Screen
     data object TeacherLogin : Screen
     data object TeacherHome : Screen
     data object TeacherResults : Screen
-    data object TeacherLessons : Screen
-    data class LessonEditor(val lessonId: String?) : Screen
+    data object TeacherUnits : Screen
+    data class UnitEditor(val unitId: String?) : Screen
     data object TeacherSettings : Screen
 }
 
-class QuizSession(val lesson: Lesson, val items: List<QuizItem>, val instantFeedback: Boolean) {
+class QuizSession(
+    val unit: StudyUnit,
+    val skill: Skill?,
+    val difficulty: Difficulty,
+    val items: List<QuizItem>,
+    val instantFeedback: Boolean,
+) {
     var index by mutableIntStateOf(0)
     var selected by mutableStateOf<Int?>(null)
     var typed by mutableStateOf("")
@@ -49,7 +59,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val backStack = mutableStateListOf<Screen>(Screen.Home)
     val screen: Screen get() = backStack.last()
 
-    var lessons by mutableStateOf(repo.loadLessons())
+    var units by mutableStateOf(repo.loadUnits())
         private set
     var results by mutableStateOf(repo.loadResults())
         private set
@@ -59,8 +69,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var instantFeedback by mutableStateOf(repo.instantFeedback)
         private set
-    var shuffleQuestions by mutableStateOf(repo.shuffleQuestions)
+    var questionsPerTest by mutableIntStateOf(repo.questionsPerTest)
         private set
+
+    /** Remembered between tests during a session so students don't re-pick each time. */
+    var lastDifficulty by mutableStateOf(Difficulty.EASY)
+    var lastSkill by mutableStateOf<Skill?>(null)
 
     var quiz by mutableStateOf<QuizSession?>(null)
         private set
@@ -81,17 +95,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setStudent(name: String) { studentName = name }
 
-    fun lessonById(id: String): Lesson? = lessons.firstOrNull { it.id == id }
+    fun unitById(id: String): StudyUnit? = units.firstOrNull { it.id == id }
 
     fun resultById(id: String): QuizResult? = results.firstOrNull { it.id == id }
 
-    fun bestPercent(lessonId: String): Int? = results
-        .filter { it.lessonId == lessonId && it.studentName.equals(studentName.trim(), ignoreCase = true) }
+    fun bestPercent(unitId: String): Int? = results
+        .filter { it.unitId == unitId && it.studentName.equals(studentName.trim(), ignoreCase = true) }
         .maxOfOrNull { it.percent }
 
-    fun startQuiz(lesson: Lesson) {
-        if (lesson.questions.isEmpty()) return
-        quiz = QuizSession(lesson, QuizEngine.prepare(lesson, shuffleQuestions), instantFeedback)
+    fun startQuiz(unit: StudyUnit, skill: Skill?, difficulty: Difficulty) {
+        val items = QuizEngine.prepare(unit, skill, difficulty, questionsPerTest)
+        if (items.isEmpty()) { message = "No questions for this choice yet."; return }
+        quiz = QuizSession(unit, skill, difficulty, items, instantFeedback)
         navigate(Screen.Quiz)
     }
 
@@ -116,8 +131,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun finishQuiz(q: QuizSession) {
         val result = QuizResult(
             studentName = studentName.trim(),
-            lessonId = q.lesson.id,
-            lessonTitle = q.lesson.title,
+            unitId = q.unit.id,
+            unitTitle = q.unit.displayTitle,
+            skill = q.skill,
+            difficulty = q.difficulty,
             timestamp = System.currentTimeMillis(),
             score = q.answers.count { it.correct },
             total = q.answers.size,
@@ -142,17 +159,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun updateInstantFeedback(v: Boolean) { instantFeedback = v; repo.instantFeedback = v }
 
-    fun updateShuffle(v: Boolean) { shuffleQuestions = v; repo.shuffleQuestions = v }
+    fun updateQuestionsPerTest(v: Int) { questionsPerTest = v; repo.questionsPerTest = v }
 
-    fun saveLesson(lesson: Lesson) {
-        lessons = if (lessons.any { it.id == lesson.id }) lessons.map { if (it.id == lesson.id) lesson else it }
-        else lessons + lesson
-        repo.saveLessons(lessons)
+    fun saveUnit(unit: StudyUnit) {
+        units = (if (units.any { it.id == unit.id }) units.map { if (it.id == unit.id) unit else it } else units + unit)
+            .sortedWith(compareBy({ it.number == 0 }, { it.number }))
+        repo.saveUnits(units)
     }
 
-    fun deleteLesson(id: String) {
-        lessons = lessons.filterNot { it.id == id }
-        repo.saveLessons(lessons)
+    fun deleteUnit(id: String) {
+        units = units.filterNot { it.id == id }
+        repo.saveUnits(units)
     }
 
     fun deleteResult(id: String) {
@@ -165,27 +182,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         repo.saveResults(results)
     }
 
-    fun restoreSampleLessons() {
-        val samples = repo.loadSampleLessons()
-        val ids = samples.map { it.id }.toSet()
-        lessons = samples + lessons.filterNot { it.id in ids }
-        repo.saveLessons(lessons)
-        message = "Sample lessons restored."
+    fun restoreBuiltInUnits() {
+        val builtIn = repo.loadBuiltInUnits()
+        val ids = builtIn.map { it.id }.toSet()
+        units = (builtIn + units.filterNot { it.id in ids }).sortedWith(compareBy({ it.number == 0 }, { it.number }))
+        repo.saveUnits(units)
+        message = "Built-in units restored."
     }
 
-    /** Merges lessons from a JSON file; lessons with the same id are replaced. */
-    fun importLessons(text: String) {
-        runCatching { Repository.parseLessons(text) }
+    /** Merges units from a JSON file; units with the same id are replaced. */
+    fun importUnits(text: String) {
+        runCatching { Repository.parseUnits(text) }
             .onSuccess { imported ->
                 val ids = imported.map { it.id }.toSet()
-                lessons = lessons.filterNot { it.id in ids } + imported
-                repo.saveLessons(lessons)
-                message = "Imported ${imported.size} lesson(s)."
+                units = (units.filterNot { it.id in ids } + imported).sortedWith(compareBy({ it.number == 0 }, { it.number }))
+                repo.saveUnits(units)
+                message = "Imported ${imported.size} unit(s)."
             }
             .onFailure { message = "Could not read that file: ${it.message?.take(120)}" }
     }
 
-    fun lessonsJson(): String = repo.lessonsToJson(lessons)
+    fun unitsJson(): String = Repository.unitsToJson(units)
 
     fun resultsCsv(): String = Repository.resultsToCsv(results)
 }
