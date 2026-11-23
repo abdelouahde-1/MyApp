@@ -22,6 +22,7 @@ import com.englishquiz.app.ui.screens.TeacherUnitsScreen
 import com.englishquiz.app.ui.screens.TeacherLoginScreen
 import com.englishquiz.app.ui.screens.TeacherResultsScreen
 import com.englishquiz.app.ui.screens.TeacherSettingsScreen
+import com.englishquiz.app.ui.screens.TeacherOnlineScreen
 
 @Composable
 fun App(vm: AppViewModel = viewModel()) {
@@ -44,6 +45,7 @@ fun App(vm: AppViewModel = viewModel()) {
         Screen.TeacherUnits -> TeacherUnitsScreen(vm)
         is Screen.UnitEditor -> UnitEditorScreen(vm, s.unitId)
         Screen.TeacherSettings -> TeacherSettingsScreen(vm)
+        Screen.TeacherOnline -> TeacherOnlineScreen(vm)
     }
 
     if (confirmQuit) {

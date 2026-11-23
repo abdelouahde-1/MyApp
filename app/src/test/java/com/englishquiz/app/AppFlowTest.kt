@@ -80,7 +80,7 @@ class AppFlowTest {
         rule.onNodeWithText("PIN").performTextInput("1234")
         rule.onNodeWithText("Unlock").performClick()
         shot("07-teacher-home")
-        rule.onNodeWithText("Student results").performClick()
+        rule.onNodeWithText("Results on this tablet").performClick()
         check(exists("Sara")) { "Result not listed" }
         shot("08-teacher-results")
 

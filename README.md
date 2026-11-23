@@ -41,7 +41,8 @@ There are about 960 questions, with at least 10 for every unit, part and level.
 Tap the lock icon on the home screen. The default PIN is **1234**; change it in Settings.
 
 - **Dashboard**: number of quizzes taken, number of students, average score.
-- **Student results**: every attempt, with unit, part (Vocabulary / Grammar / Functions / Mixed), level and score. Shows averages per unit and per part. Each attempt can be opened for a full answer review. Results can be exported to CSV for Excel or Google Sheets.
+- **Online results (all tablets)**: every test a student finishes is sent automatically to your own free Firebase project. Students don't do anything. If a tablet is offline, the result is kept and sent later. You sign in with your email and password, then filter by class or student, open each student's answers, and export to CSV. Setup takes about 15 minutes, once: see **[docs/ONLINE_RESULTS_SETUP.md](docs/ONLINE_RESULTS_SETUP.md)**. To set up the other tablets, copy a setup code from the first one and paste it.
+- **Results on this tablet**: every attempt, with unit, part (Vocabulary / Grammar / Functions / Mixed), level and score. Shows averages per unit and per part. Each attempt can be opened for a full answer review. Results can be exported to CSV for Excel or Google Sheets.
 - **Units & questions**: edit any unit in the app. For each part you can change the lesson text and add, edit, reorder or delete questions. Each question has a level, a type (choice / true-false / write the answer), an optional picture (an emoji, or a photo from the gallery) and an explanation.
 - Import or export all units as JSON to copy them to other tablets. Photos are included in the file.
 - **Settings**: questions per test (5 / 10 / 15 / 20), feedback after each question or only at the end, restore built-in units.
@@ -57,6 +58,8 @@ The built-in units are generated from the Python files in `content/` (one file p
 ```
 python3 content/build_units.py   # writes app/src/main/assets/units.json
 ./gradlew testDebugUnitTest      # checks every unit, part and level has at least 10 valid questions
+                                 # (the online-results tests also run if the Firebase emulators are running:
+                                 #  firebase emulators:start --only auth,firestore --project demo-quiz)
 ./gradlew assembleDebug          # APK in app/build/outputs/apk/debug/
 ```
 

@@ -99,6 +99,8 @@ data class QuizResult(
     val score: Int,
     val total: Int,
     val answers: List<AnswerRecord>,
+    /** Class / group name set on the tablet (teacher settings). */
+    val className: String = "",
 ) {
     val percent: Int get() = if (total == 0) 0 else Math.round(score * 100f / total)
     val focusLabel: String get() = skill?.label ?: "Mixed"

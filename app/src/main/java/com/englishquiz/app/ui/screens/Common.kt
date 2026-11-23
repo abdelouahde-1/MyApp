@@ -54,8 +54,8 @@ fun AppScaffold(
     val msg = vm.message
     LaunchedEffect(msg) {
         if (msg != null) {
+            vm.message = null // clear first, so the next screen doesn't show it again
             snackbar.showSnackbar(msg)
-            vm.message = null
         }
     }
     Scaffold(

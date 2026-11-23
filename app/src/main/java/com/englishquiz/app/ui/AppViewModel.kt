@@ -7,6 +7,12 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.englishquiz.app.data.CloudConfig
+import com.englishquiz.app.data.CloudException
+import com.englishquiz.app.data.CloudResult
+import com.englishquiz.app.data.CloudSync
+import kotlinx.coroutines.launch
 import com.englishquiz.app.data.AnswerRecord
 import com.englishquiz.app.data.Difficulty
 import com.englishquiz.app.data.QuizEngine
@@ -30,6 +36,7 @@ sealed interface Screen {
     data object TeacherUnits : Screen
     data class UnitEditor(val unitId: String?) : Screen
     data object TeacherSettings : Screen
+    data object TeacherOnline : Screen
 }
 
 class QuizSession(
@@ -81,6 +88,97 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     var message by mutableStateOf<String?>(null)
 
+    // ---------- Online results ----------
+
+    private val cloud = CloudSync(app)
+    var cloudConfig by mutableStateOf(cloud.config)
+        private set
+    var className by mutableStateOf(cloud.className)
+        private set
+    var pendingUploads by mutableIntStateOf(cloud.pending().size)
+        private set
+    var cloudError by mutableStateOf(cloud.lastError)
+        private set
+    var cloudBusy by mutableStateOf(false)
+        private set
+    var teacherEmailSignedIn by mutableStateOf(cloud.teacherSignedInEmail)
+        private set
+    var onlineResults by mutableStateOf<List<CloudResult>>(emptyList())
+        private set
+    var onlineLoadedAt by mutableStateOf(0L)
+        private set
+
+    init {
+        if (pendingUploads > 0) { CloudSync.schedule(app); trySendNow() }
+    }
+
+    private fun refreshCloudState() {
+        pendingUploads = cloud.pending().size
+        cloudError = cloud.lastError
+    }
+
+    private fun trySendNow() {
+        viewModelScope.launch {
+            runCatching { cloud.flush() }
+            refreshCloudState()
+        }
+    }
+
+    private fun cloudCall(onError: (CloudException) -> Unit = { message = it.message }, block: suspend () -> Unit) {
+        viewModelScope.launch {
+            cloudBusy = true
+            try { block() } catch (e: CloudException) { onError(e) } finally {
+                cloudBusy = false
+                refreshCloudState()
+                teacherEmailSignedIn = cloud.teacherSignedInEmail
+            }
+        }
+    }
+
+    fun saveCloudSettings(config: CloudConfig, cls: String) {
+        cloud.config = config
+        cloud.className = cls
+        cloudConfig = cloud.config
+        className = cloud.className
+        teacherEmailSignedIn = cloud.teacherSignedInEmail
+        if (!config.isSet) { message = "Online results turned off."; return }
+        cloudCall {
+            cloud.testConnection()
+            message = "Connected! Results from this tablet will be sent online."
+            if (cloud.pending().isNotEmpty()) cloud.flush()
+        }
+    }
+
+    fun sendPendingNow() = cloudCall {
+        val n = cloud.flush()
+        message = if (n > 0) "Sent $n result(s)." else "Nothing waiting to be sent."
+    }
+
+    fun teacherSignIn(email: String, password: String) = cloudCall {
+        cloud.teacherSignIn(email, password)
+        teacherEmailSignedIn = cloud.teacherSignedInEmail
+        loadOnlineResults()
+    }
+
+    fun teacherSignOut() {
+        cloud.teacherSignOut()
+        teacherEmailSignedIn = null
+        onlineResults = emptyList()
+    }
+
+    fun loadOnlineResults() = cloudCall {
+        onlineResults = cloud.downloadResults()
+        onlineLoadedAt = System.currentTimeMillis()
+    }
+
+    fun deleteOnlineResult(id: String) = cloudCall {
+        cloud.deleteOnline(id)
+        onlineResults = onlineResults.filterNot { it.result.id == id }
+        message = "Deleted from the online results."
+    }
+
+    fun onlineResultsCsv(filter: List<CloudResult>): String = Repository.resultsToCsv(filter.map { it.result })
+
     // ---------- Navigation ----------
 
     fun navigate(s: Screen) { backStack.add(s) }
@@ -97,7 +195,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun unitById(id: String): StudyUnit? = units.firstOrNull { it.id == id }
 
-    fun resultById(id: String): QuizResult? = results.firstOrNull { it.id == id }
+    fun resultById(id: String): QuizResult? =
+        results.firstOrNull { it.id == id } ?: onlineResults.firstOrNull { it.result.id == id }?.result
 
     fun bestPercent(unitId: String): Int? = results
         .filter { it.unitId == unitId && it.studentName.equals(studentName.trim(), ignoreCase = true) }
@@ -139,9 +238,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             score = q.answers.count { it.correct },
             total = q.answers.size,
             answers = q.answers.toList(),
+            className = className,
         )
         results = results + result
         repo.saveResults(results)
+        cloud.enqueue(result)
+        refreshCloudState()
+        if (cloudConfig.isSet) trySendNow()
         quiz = null
         replaceTop(Screen.Result(result.id))
     }

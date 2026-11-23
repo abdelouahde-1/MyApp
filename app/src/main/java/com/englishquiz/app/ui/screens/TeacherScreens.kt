@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.AlertDialog
@@ -120,7 +121,10 @@ fun TeacherHomeScreen(vm: AppViewModel) {
                 StatCard("Students", students.toString(), Modifier.weight(1f))
                 StatCard("Average", avg?.let { "$it%" } ?: "—", Modifier.weight(1f))
             }
-            MenuCard(Icons.Filled.Person, "Student results", "See scores, review answers, export to CSV") { vm.navigate(Screen.TeacherResults) }
+            MenuCard(Icons.Filled.Share, "Online results (all tablets)",
+                if (vm.cloudConfig.isSet) "Results sent from every tablet" + (if (vm.pendingUploads > 0) " · ${vm.pendingUploads} waiting on this tablet" else "")
+                else "Not set up yet: see Settings") { vm.navigate(Screen.TeacherOnline) }
+            MenuCard(Icons.Filled.Person, "Results on this tablet", "See scores, review answers, export to CSV") { vm.navigate(Screen.TeacherResults) }
             MenuCard(Icons.AutoMirrored.Filled.List, "Units & questions", "${vm.units.size} units · ${vm.units.sumOf { it.totalQuestions }} questions · edit, import, export") { vm.navigate(Screen.TeacherUnits) }
             MenuCard(Icons.Filled.Settings, "Settings", "PIN, feedback mode, questions per test") { vm.navigate(Screen.TeacherSettings) }
         }
@@ -340,6 +344,11 @@ fun TeacherSettingsScreen(vm: AppViewModel) {
                 Spacer(Modifier.width(12.dp))
                 Button(onClick = { vm.changePin(newPin); newPin = ""; vm.message = "PIN changed." }, enabled = newPin.length >= 4) { Text("Save") }
             }
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
+            CloudSettingsSection(vm)
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider()
             Spacer(Modifier.height(24.dp))
             OutlinedButton(onClick = { confirmRestore = true }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.Star, contentDescription = null); Spacer(Modifier.width(8.dp)); Text("Restore built-in units")

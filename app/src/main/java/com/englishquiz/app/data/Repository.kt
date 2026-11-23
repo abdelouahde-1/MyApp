@@ -83,9 +83,10 @@ class Repository(private val context: Context) {
 
         fun resultsToCsv(results: List<QuizResult>): String {
             val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
-            val sb = StringBuilder("Student,Unit,Focus,Level,Date,Score,Total,Percent\n")
+            val sb = StringBuilder("Student,Class,Unit,Focus,Level,Date,Score,Total,Percent\n")
             results.sortedBy { it.timestamp }.forEach { r ->
                 sb.append(csv(r.studentName)).append(',')
+                    .append(csv(r.className)).append(',')
                     .append(csv(r.unitTitle)).append(',')
                     .append(r.focusLabel).append(',')
                     .append(r.difficulty.label).append(',')

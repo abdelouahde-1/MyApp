@@ -94,7 +94,7 @@ class QuizLogicTest {
         val r = QuizResult(studentName = "Smith, Ana", unitId = "u", unitTitle = "Unit 1: Youth", skill = Skill.GRAMMAR,
             difficulty = Difficulty.HARD, timestamp = 0, score = 3, total = 4, answers = emptyList())
         val line = Repository.resultsToCsv(listOf(r)).lines()[1]
-        assertTrue(line, line.startsWith("\"Smith, Ana\",Unit 1: Youth,Grammar,Hard,"))
+        assertTrue(line, line.startsWith("\"Smith, Ana\",,Unit 1: Youth,Grammar,Hard,"))
         assertTrue(line.endsWith(",3,4,75"))
     }
 }
