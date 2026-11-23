@@ -15,7 +15,6 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
-import java.util.Base64
 
 /** The teacher's Firebase project. Only the project ID and the Web API key are needed. */
 data class CloudConfig(
@@ -25,34 +24,33 @@ data class CloudConfig(
 ) {
     val isSet: Boolean get() = projectId.isNotBlank() && apiKey.isNotBlank()
 
-    /** A short code the teacher copies from one tablet and pastes on the others. */
-    fun toSetupCode(): String {
-        val json = buildJsonObject { put("p", projectId); put("k", apiKey); put("e", teacherEmail) }.toString()
-        return "EQ1-" + Base64.getUrlEncoder().withoutPadding().encodeToString(json.toByteArray())
-    }
-
-    /** Firestore security rules: tablets may only add results; only the teacher can read or delete them. */
+    /** Firestore security rules: tablets may add results and read settings/units; only the teacher reads results and publishes. */
     fun securityRules(): String = """
         rules_version = '2';
         service cloud.firestore {
           match /databases/{database}/documents {
-            match /results/{resultId} {
-              allow create: if request.auth != null;
-              allow read, delete: if request.auth != null
+            function isTeacher() {
+              return request.auth != null
                 && request.auth.token.email == "${teacherEmail.trim().lowercase().ifBlank { "YOUR_EMAIL@gmail.com" }}";
+            }
+            match /results/{id} {
+              allow create: if request.auth != null;
+              allow read, delete: if isTeacher();
+            }
+            match /config/{id} {
+              allow read: if request.auth != null;
+              allow write: if isTeacher();
+            }
+            match /units/{id} {
+              allow read: if request.auth != null;
+              allow write: if isTeacher();
             }
           }
         }
     """.trimIndent()
-
-    companion object {
-        fun fromSetupCode(code: String): CloudConfig? = runCatching {
-            val raw = code.trim().removePrefix("EQ1-")
-            val obj = Repository.json.parseToJsonElement(String(Base64.getUrlDecoder().decode(raw))).jsonObject
-            CloudConfig(obj.str("p"), obj.str("k"), obj.str("e")).takeIf { it.isSet }
-        }.getOrNull()
-    }
 }
+
+private const val DOC_NOT_FOUND = "Document not found."
 
 /** A result as stored online (it also records which class/tablet it came from). */
 data class CloudResult(val result: QuizResult, val className: String, val device: String)
@@ -158,6 +156,62 @@ class FirebaseClient(private val config: CloudConfig, private val endpoints: End
     fun delete(idToken: String, resultId: String) {
         request("DELETE", "$docsBase/results/" + enc(resultId), null, bearer = idToken)
     }
+
+    // ---------- JSON documents (settings, units) ----------
+
+    /** Reads documents/{path} whose content is stored as a JSON string in field "json". Null if missing. */
+    fun getJsonDoc(idToken: String, path: String): String? = try {
+        request("GET", "$docsBase/$path", null, bearer = idToken)["fields"]?.jsonObject?.get("json")
+            ?.jsonObject?.get("stringValue")?.jsonPrimitive?.content
+    } catch (e: CloudException) {
+        if (e.message == DOC_NOT_FOUND) null else throw e
+    }
+
+    /** One write of a batch: put JSON text at [path], or delete [path] when [json] is null. */
+    data class Write(val path: String, val json: String?, val order: Long = 0)
+
+    /** Applies all writes atomically (Firestore “commit”), e.g. publishing every unit plus the new version number. */
+    fun commit(idToken: String, writes: List<Write>) {
+        val root = "projects/${config.projectId.trim()}/databases/(default)/documents"
+        writes.chunked(400).forEach { chunk ->
+            val body = buildJsonObject {
+                put("writes", buildJsonArray {
+                    chunk.forEach { w ->
+                        add(buildJsonObject {
+                            if (w.json == null) put("delete", "$root/${w.path}")
+                            else put("update", buildJsonObject {
+                                put("name", "$root/${w.path}")
+                                put("fields", buildJsonObject { put("json", s(w.json)); put("order", i(w.order)) })
+                            })
+                        })
+                    }
+                })
+            }.toString()
+            post("$docsBase:commit", body, bearer = idToken)
+        }
+    }
+
+    fun putJsonDoc(idToken: String, path: String, json: String, order: Long = 0) = commit(idToken, listOf(Write(path, json, order)))
+
+    /** All documents of a collection as (id, json) pairs, sorted by their "order" field. */
+    fun listJsonDocs(idToken: String, collection: String): List<Pair<String, String>> {
+        val out = mutableListOf<Triple<Long, String, String>>()
+        var pageToken: String? = null
+        do {
+            var url = "$docsBase/$collection?pageSize=100"
+            if (pageToken != null) url += "&pageToken=" + enc(pageToken)
+            val o = request("GET", url, null, bearer = idToken)
+            o["documents"]?.jsonArray?.forEach { d ->
+                val f = d.jsonObject["fields"]?.jsonObject ?: return@forEach
+                val json = f["json"]?.jsonObject?.get("stringValue")?.jsonPrimitive?.content ?: return@forEach
+                val order = f["order"]?.jsonObject?.get("integerValue")?.jsonPrimitive?.content?.toLongOrNull() ?: 0
+                out += Triple(order, d.jsonObject.str("name").substringAfterLast('/'), json)
+            }
+            pageToken = o.str("nextPageToken").ifBlank { null }
+        } while (pageToken != null)
+        return out.sortedBy { it.first }.map { it.second to it.third }
+    }
+
 
     // ---------- Encoding ----------
 
@@ -285,6 +339,8 @@ class FirebaseClient(private val config: CloudConfig, private val endpoints: End
             val text = (if (code in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
             if (code !in 200..299) {
                 val err = HttpError(code, text)
+                if (method == "GET" && code == 404 && "NOT_FOUND" in text.uppercase() && "/documents/" in url && "?" !in url.substringAfterLast("/documents/"))
+                    throw CloudException(CloudException.Kind.BAD_CONFIG, DOC_NOT_FOUND)
                 if (method == "POST" && code == 409) throw err
                 throw err.toCloud()
             }

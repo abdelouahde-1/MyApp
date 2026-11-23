@@ -1,0 +1,4 @@
+<resources>
+    <!-- Teacher app icon is green so it is easy to tell apart from the student app. -->
+    <color name="ic_launcher_background">#2E7D32</color>
+</resources>

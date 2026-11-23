@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isTeacher() {
+      return request.auth != null
+        && request.auth.token.email == "teacher@example.com";
+    }
+    match /results/{id} {
+      allow create: if request.auth != null;
+      allow read, delete: if isTeacher();
+    }
+    match /config/{id} {
+      allow read: if request.auth != null;
+      allow write: if isTeacher();
+    }
+    match /units/{id} {
+      allow read: if request.auth != null;
+      allow write: if isTeacher();
+    }
+  }
+}

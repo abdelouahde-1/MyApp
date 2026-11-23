@@ -1,9 +1,14 @@
-# English Lesson Quiz (Android)
+# English Quiz (Android): student app + teacher app
 
-An Android app that tests 2nd-year Baccalaureate (2BAC) students on the ten units of the
-*Stairway to English* booklet (based on *Ticket 2 English*). It covers **vocabulary, grammar and functions**.
+Two Android apps for testing 2nd-year Baccalaureate (2BAC) students on the ten units of the
+*Stairway to English* booklet (based on *Ticket 2 English*). They cover **vocabulary, grammar and functions**.
 
-![Screenshots: units, level & focus choice, lesson, question, result, picture question with feedback](docs/screenshots.png)
+- **English Quiz** (student app, on the class tablets): name, class, unit, level, focus, lesson, then the test. Results are sent to the teacher automatically.
+- **English Quiz Teacher** (teacher's phone): results from every tablet, statistics, editing and publishing units, settings for all tablets.
+
+![Screenshots: student home with classes, results, statistics, student progress, settings, units](docs/screenshots.png)
+
+Firebase setup (one time, about 15 minutes): **[docs/ONLINE_RESULTS_SETUP.md](docs/ONLINE_RESULTS_SETUP.md)**.
 
 ## How students use it
 
@@ -36,20 +41,16 @@ An Android app that tests 2nd-year Baccalaureate (2BAC) students on the ten unit
 
 There are about 960 questions, with at least 10 for every unit, part and level.
 
-## Teacher area
+## Teacher app
 
-Tap the lock icon on the home screen. The default PIN is **1234**; change it in Settings.
-
-- **Dashboard**: number of quizzes taken, number of students, average score.
-- **Online results (all tablets)**: every test a student finishes is sent automatically to your own free Firebase project. Students don't do anything. If a tablet is offline, the result is kept and sent later. You sign in with your email and password, then filter by class or student, open each student's answers, and export to CSV. Setup takes about 15 minutes, once: see **[docs/ONLINE_RESULTS_SETUP.md](docs/ONLINE_RESULTS_SETUP.md)**. To set up the other tablets, copy a setup code from the first one and paste it.
-- **Results on this tablet**: every attempt, with unit, part (Vocabulary / Grammar / Functions / Mixed), level and score. Shows averages per unit and per part. Each attempt can be opened for a full answer review. Results can be exported to CSV for Excel or Google Sheets.
-- **Units & questions**: edit any unit in the app. For each part you can change the lesson text and add, edit, reorder or delete questions. Each question has a level, a type (choice / true-false / write the answer), an optional picture (an emoji, or a photo from the gallery) and an explanation.
-- Import or export all units as JSON to copy them to other tablets. Photos are included in the file.
-- **Settings**: questions per test (5 / 10 / 15 / 20), feedback after each question or only at the end, restore built-in units.
+- **Results**: every test finished on any tablet: student, class, unit, part, level, score and date. Search, filter by class, view every answer, delete results, export to CSV.
+- **Statistics**: tests, students and average score; percentage correct by part (vocabulary / grammar / functions), by level and by unit; the 10 most-missed questions; every student's average with a progress trend (▲▼), and their full history.
+- **Units**: edit lessons and questions. Each question has a level, a type, an optional picture (emoji or photo) and an explanation. **Publish to tablets** sends your version to every tablet. You can also import and export units as JSON, or restore the built-in units.
+- **Settings** (sent to every tablet): class list (students pick their class on the home screen), questions per test (5 / 10 / 15 / 20), feedback after each question.
 
 ## Install on a phone or tablet
 
-On GitHub, open **Actions**, then the latest **Build APK** run, and download `english-lesson-quiz-apk`. Unzip it and open `app-debug.apk` on the device (Android 8 or newer).
+On GitHub, open **Actions**, then the latest **Build APKs** run. Download **english-quiz-student-apk** for the tablets and **english-quiz-teacher-apk** for your phone. Unzip each and open the `.apk` on the device (Android 8 or newer).
 
 ## Editing the built-in content
 
@@ -57,14 +58,14 @@ The built-in units are generated from the Python files in `content/` (one file p
 
 ```
 python3 content/build_units.py   # writes app/src/main/assets/units.json
-./gradlew testDebugUnitTest      # checks every unit, part and level has at least 10 valid questions
+./gradlew testStudentDebugUnitTest testTeacherDebugUnitTest   # checks every unit, part and level has at least 10 valid questions
                                  # (the online-results tests also run if the Firebase emulators are running:
                                  #  firebase emulators:start --only auth,firestore --project demo-quiz)
-./gradlew assembleDebug          # APK in app/build/outputs/apk/debug/
+./gradlew assembleStudentDebug assembleTeacherDebug   # APKs in app/build/outputs/apk/{student,teacher}/debug/
 ```
 
 In those files, `mc(level, prompt, [correct, wrong, …])` is a multiple-choice question; put the correct answer first, and the app shuffles the options.
 `tf(level, prompt, True/False)` is true/false. `wr(level, prompt, ["answer", "alternative"])` is a question the student types; capitals, extra spaces and final punctuation are ignored.
 In lesson text, `# ` starts a heading, `• ` starts a bullet, and `**word**` is bold.
 
-Devices that already have the app keep their own copy of the units. After an update, use **Settings → Restore built-in units** to load the new content.
+Built-in units are used until the teacher publishes units from the teacher app. After that, the tablets use the published version.

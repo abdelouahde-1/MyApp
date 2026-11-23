@@ -1,92 +1,84 @@
-# Setting up online results (Firebase)
+# Setting up Firebase (one time)
 
-Once this is set up, **every test a student finishes is sent to you automatically**. Students don't have to do anything.
-You see the results from all tablets in the app: **teacher area → Online results (all tablets)**.
+There are two apps:
 
-It is free. Firebase's free plan allows 20,000 results a day.
-You do this once, on a computer, in about 15 minutes.
+- **English Quiz** (student app, on the class tablets): students type their name, pick their class and take tests. Every result is sent to you automatically. There is nothing to set up on the tablets.
+- **English Quiz Teacher** (on your phone): results from all tablets, statistics, editing and publishing units, settings (class list, questions per test, feedback).
+
+Both apps use your free Firebase project. Do the steps below once, on a computer or phone browser, in about 15 minutes.
 
 ---
 
-## 1. Create a Firebase project
-
+## 1. Create the project
 1. Go to **https://console.firebase.google.com** and sign in with your Google account.
-2. Click **Create a project** (or **Add project**).
-3. Give it a name, for example `english-quiz`, and click **Continue**.
-4. Turn **Google Analytics** off (you don't need it), then click **Create project**.
+2. **Create a project**, give it a name (for example `ENG QUIZ`), turn Google Analytics off, and click **Create**.
 
 ## 2. Turn on sign-in
-
-1. In the left menu: **Build → Authentication → Get started**.
-2. Open the **Sign-in method** tab and enable these two (click each one, switch it on, then **Save**):
-   - **Anonymous**: the tablets use this to send results.
-   - **Email/Password**: you use this to read the results.
-3. Open the **Users** tab and click **Add user**. Enter **your email** and a **password** you will remember.
+1. Left menu: **Security → Authentication → Get started**.
+2. **Sign-in method** tab:
+   - **Anonymous**: switch it on and **Save**. The tablets use this.
+   - **Add new provider → Email/Password**: switch it on and **Save**. You use this.
+3. **Users** tab → **Add user**: enter your email and a password. You sign in to the teacher app with these.
 
 ## 3. Create the database
-
-1. In the left menu: **Build → Firestore Database → Create database**.
-2. Choose a location close to Morocco, for example **europe-west1 (Belgium)** or **eur3 (Europe)**.
-3. Choose **Start in production mode**, then click **Create**.
-4. Open the **Rules** tab. Delete everything there and paste this, **replacing the email with yours**:
+1. Left menu: **Databases & Storage → Firestore → Create database**.
+2. Edition: **Standard**. Location: **europe-southwest1 (Madrid)**, which is the closest to Morocco; if it isn't offered, use `eur3` or `europe-west1`.
+3. Choose **Start in production mode**, then **Create**.
+4. Open the **Rules** tab, delete everything, paste the rules below **with your email**, and click **Publish**:
 
 ```
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /results/{resultId} {
-      allow create: if request.auth != null;
-      allow read, delete: if request.auth != null
+    function isTeacher() {
+      return request.auth != null
         && request.auth.token.email == "your.email@gmail.com";
+    }
+    match /results/{id} {
+      allow create: if request.auth != null;
+      allow read, delete: if isTeacher();
+    }
+    match /config/{id} {
+      allow read: if request.auth != null;
+      allow write: if isTeacher();
+    }
+    match /units/{id} {
+      allow read: if request.auth != null;
+      allow write: if isTeacher();
     }
   }
 }
 ```
 
-5. Click **Publish**.
+What the rules allow:
+- Tablets can **send** results and **read** your settings and units.
+- Only you can **read or delete** results, and only you can **change** settings or units.
 
-These rules mean tablets can **add** results but can never read them, and only **you** can read or delete results.
-The app can also copy these rules for you with your email already filled in: **Settings → How to set up → Copy security rules**.
+The teacher app can also copy these rules with your email already filled in: **Settings → Copy security rules**.
 
-## 4. Connect the first tablet
+## 4. Get the Web API key
+1. ⚙️ **Settings → General**. Note the **Project ID**, for example `eng-quiz-b1cc0`.
+2. Under **Your apps**, tap the **`</>`** (Web) button, type a nickname, and tap **Register app**. Leave Firebase Hosting unticked.
+3. Copy the `apiKey` value, which starts with `AIza…`.
 
-1. In Firebase, click the ⚙️ gear (top left) → **Project settings** → **General** tab.
-2. Note the **Project ID** and the **Web API key**.
-3. On the tablet: **teacher area → Settings → Online results (Firebase)**:
-   - **Firebase project ID**: paste the Project ID
-   - **Web API key**: paste the Web API key
-   - **Your (teacher) email**: the email you added in step 2
-   - **Class / group** (optional): for example `2BAC SH 3`. It is sent with every result from this tablet, so you can filter by class.
-4. Tap **Save & test**. It should say **🟢 Set up · all results sent**.
-
-## 5. Connect the other tablets (no typing)
-
-1. On the tablet you just set up, tap **Copy setup code**.
-2. Send the code to the other tablets, for example by WhatsApp to yourself, or by email.
-3. On each other tablet: **teacher area → Settings → Paste setup code**. Then set that tablet's **class** and tap **Save & test**.
-
-## 6. See the results
-
-On any device with the app (your own phone works too; just set it up with the setup code):
-**teacher area → Online results (all tablets)** → sign in with your email and password.
-
-From there you can:
-- search by student or unit, or filter by class
-- see each class's number of tests and average score
-- tap a result to see every answer the student gave
-- **⋮ → Export shown results (CSV)** to open them in Excel or Google Sheets
-- delete a result
-
-You can also look at the raw data in the Firebase console, under **Firestore Database → results**.
+The project ID and API key are built into both apps (`gradle.properties`: `firebaseProjectId`, `firebaseApiKey`).
+The API key is not a secret; it is meant to be inside apps. The security rules decide who can read what.
 
 ---
 
-## Good to know
+## Using the teacher app
 
-- **No internet?** The result is kept on the tablet and sent automatically when the connection comes back. Settings shows how many results are waiting, and has a **Send now** button.
-- **Results stay on the tablet as well**: **teacher area → Results on this tablet** keeps working as before.
-- **Problems** are shown in Settings next to the 🔴 symbol:
-  - *"The project ID or API key is wrong"*: copy them again from Project settings.
-  - *"Sign-in method not enabled"*: switch on **Anonymous** and **Email/Password** (step 2).
-  - *"Permission denied"*: check the rules (step 3) and that the email in the rules is exactly the one you sign in with.
-  - *"Firestore database not found"*: do step 3.
+1. Install **English Quiz Teacher** on your phone and sign in with the email and password from step 2.
+2. **Settings**: add your classes (for example `2BAC SH 1`, `2BAC SH 3`), choose the number of questions per test and whether students see feedback after each question, then tap **Save & send to tablets**.
+3. **Units**: edit any unit or create new ones. When you're done, tap **Publish to tablets**.
+4. **Results**: every finished test from every tablet. Search, filter by class, tap a result to see the answers, and use **⋮ → Export results (CSV)**.
+5. **Statistics**: averages by part (vocabulary / grammar / functions), by level and by unit, the most-missed questions, and every student's progress (▲▼).
+
+Tablets download your settings and published units each time the student app is opened.
+Results are sent the moment a test ends. If a tablet is offline, its results are kept and sent later.
+
+## Troubleshooting
+- *Wrong email or password*: use the user you added in Authentication → Users.
+- *Permission denied*: check that the email in the rules (step 3) is exactly the one you sign in with, and that you clicked **Publish**.
+- *Sign-in method not enabled*: enable **Anonymous** and **Email/Password** (step 2).
+- *The project ID or API key is wrong*: check `gradle.properties`, then rebuild the apps.

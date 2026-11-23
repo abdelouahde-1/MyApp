@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APKs
 
 on:
   push:
@@ -15,11 +15,15 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
-      - name: Run unit tests
-        run: ./gradlew --no-daemon testDebugUnitTest
-      - name: Build debug APK
-        run: ./gradlew --no-daemon assembleDebug
+      - name: Run tests
+        run: ./gradlew --no-daemon testStudentDebugUnitTest testTeacherDebugUnitTest
+      - name: Build both apps
+        run: ./gradlew --no-daemon assembleStudentDebug assembleTeacherDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: english-lesson-quiz-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: english-quiz-student-apk
+          path: app/build/outputs/apk/student/debug/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: english-quiz-teacher-apk
+          path: app/build/outputs/apk/teacher/debug/*.apk

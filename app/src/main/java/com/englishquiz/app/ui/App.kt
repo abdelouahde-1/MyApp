@@ -11,18 +11,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.englishquiz.app.ui.screens.HomeScreen
+import com.englishquiz.app.ui.screens.StudentHistoryScreen
+import com.englishquiz.app.ui.screens.TeacherMainScreen
+import com.englishquiz.app.ui.screens.TeacherSignInScreen
 import com.englishquiz.app.ui.screens.LessonScreen
 import com.englishquiz.app.ui.screens.UnitSetupScreen
 import com.englishquiz.app.ui.screens.UnitEditorScreen
 import com.englishquiz.app.ui.screens.UnitListScreen
 import com.englishquiz.app.ui.screens.QuizScreen
 import com.englishquiz.app.ui.screens.ResultScreen
-import com.englishquiz.app.ui.screens.TeacherHomeScreen
-import com.englishquiz.app.ui.screens.TeacherUnitsScreen
-import com.englishquiz.app.ui.screens.TeacherLoginScreen
-import com.englishquiz.app.ui.screens.TeacherResultsScreen
-import com.englishquiz.app.ui.screens.TeacherSettingsScreen
-import com.englishquiz.app.ui.screens.TeacherOnlineScreen
 
 @Composable
 fun App(vm: AppViewModel = viewModel()) {
@@ -39,13 +36,10 @@ fun App(vm: AppViewModel = viewModel()) {
         is Screen.Lesson -> LessonScreen(vm, s)
         Screen.Quiz -> QuizScreen(vm, onQuit = { confirmQuit = true })
         is Screen.Result -> ResultScreen(vm, s.resultId, s.fromTeacher)
-        Screen.TeacherLogin -> TeacherLoginScreen(vm)
-        Screen.TeacherHome -> TeacherHomeScreen(vm)
-        Screen.TeacherResults -> TeacherResultsScreen(vm)
-        Screen.TeacherUnits -> TeacherUnitsScreen(vm)
+        Screen.TeacherSignIn -> TeacherSignInScreen(vm)
+        is Screen.TeacherMain -> TeacherMainScreen(vm, s.tab)
         is Screen.UnitEditor -> UnitEditorScreen(vm, s.unitId)
-        Screen.TeacherSettings -> TeacherSettingsScreen(vm)
-        Screen.TeacherOnline -> TeacherOnlineScreen(vm)
+        is Screen.StudentHistory -> StudentHistoryScreen(vm, s.name)
     }
 
     if (confirmQuit) {

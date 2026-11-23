@@ -14,8 +14,28 @@ android {
         applicationId = "com.englishquiz.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 3
+        versionName = "3.0"
+
+        // The teacher's Firebase project (see docs/ONLINE_RESULTS_SETUP.md). Set in gradle.properties.
+        buildConfigField("String", "FIREBASE_PROJECT_ID", "\"${project.findProperty("firebaseProjectId") ?: ""}\"")
+        buildConfigField("String", "FIREBASE_API_KEY", "\"${project.findProperty("firebaseApiKey") ?: ""}\"")
+    }
+
+    flavorDimensions += "role"
+    productFlavors {
+        create("student") {
+            dimension = "role"
+            applicationId = "com.englishquiz.app"
+            resValue("string", "app_name", "English Quiz")
+            buildConfigField("boolean", "IS_TEACHER", "false")
+        }
+        create("teacher") {
+            dimension = "role"
+            applicationId = "com.englishquiz.teacher"
+            resValue("string", "app_name", "English Quiz Teacher")
+            buildConfigField("boolean", "IS_TEACHER", "true")
+        }
     }
 
     buildTypes {
@@ -33,6 +53,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true

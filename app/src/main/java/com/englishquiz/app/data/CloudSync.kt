@@ -2,6 +2,7 @@ package com.englishquiz.app.data
 
 import android.content.Context
 import android.os.Build
+import com.englishquiz.app.BuildConfig
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -31,19 +32,8 @@ class CloudSync(private val context: Context, private val endpoints: Endpoints =
     private val prefs = context.getSharedPreferences("cloud", Context.MODE_PRIVATE)
     private val pendingFile = File(context.filesDir, "pending_uploads.json")
 
-    var config: CloudConfig
-        get() = CloudConfig(prefs.getString("project", "")!!, prefs.getString("key", "")!!, prefs.getString("email", "")!!)
-        set(v) {
-            val changed = v.projectId != config.projectId || v.apiKey != config.apiKey
-            prefs.edit().putString("project", v.projectId.trim()).putString("key", v.apiKey.trim())
-                .putString("email", v.teacherEmail.trim().lowercase()).apply()
-            if (changed) prefs.edit().remove("device_refresh").remove("teacher_refresh").remove("teacher_email").apply()
-        }
-
-    /** Class or group name sent with every result from this tablet (e.g. "2BAC SH 3"). */
-    var className: String
-        get() = prefs.getString("class", "")!!
-        set(v) = prefs.edit().putString("class", v.trim()).apply()
+    /** The Firebase project is built into the apps (gradle.properties); tests use the emulator project. */
+    val config: CloudConfig = configOverride ?: CloudConfig(BuildConfig.FIREBASE_PROJECT_ID, BuildConfig.FIREBASE_API_KEY)
 
     var lastError: String?
         get() = prefs.getString("last_error", null)
@@ -107,8 +97,71 @@ class CloudSync(private val context: Context, private val endpoints: Endpoints =
         }
     }
 
-    /** Checks the setup by signing in anonymously (used by the “Test connection” button). */
-    suspend fun testConnection(): Unit = withContext(Dispatchers.IO) { deviceToken(); Unit }
+    // ---------- Tablet: download the teacher's settings and units ----------
+
+    var cachedSettings: RemoteSettings
+        get() = prefs.getString("settings_json", null)
+            ?.let { runCatching { Repository.json.decodeFromString<RemoteSettings>(it) }.getOrNull() } ?: RemoteSettings()
+        private set(v) = prefs.edit().putString("settings_json", Repository.json.encodeToString(RemoteSettings.serializer(), v)).apply()
+
+    var cachedUnitsVersion: Long
+        get() = prefs.getLong("units_version", 0)
+        private set(v) = prefs.edit().putLong("units_version", v).apply()
+
+    /**
+     * Downloads the teacher's settings, and the units if they were re-published.
+     * Returns the new units, or null when they haven't changed.
+     */
+    suspend fun syncFromTeacher(): List<StudyUnit>? = withContext(Dispatchers.IO) {
+        if (!config.isSet) return@withContext null
+        val token = deviceToken()
+        val c = client()
+        val settings = c.getJsonDoc(token, SETTINGS_PATH)
+            ?.let { runCatching { Repository.json.decodeFromString<RemoteSettings>(it) }.getOrNull() } ?: RemoteSettings()
+        cachedSettings = settings
+        if (settings.unitsVersion != 0L && settings.unitsVersion != cachedUnitsVersion) {
+            val units = c.listJsonDocs(token, "units").mapNotNull { (_, json) ->
+                runCatching { Repository.json.decodeFromString<StudyUnit>(json) }.getOrNull()
+            }
+            if (units.isNotEmpty()) {
+                cachedUnitsVersion = settings.unitsVersion
+                return@withContext units
+            }
+        }
+        null
+    }
+
+    // ---------- Teacher: publish ----------
+
+    suspend fun fetchSettings(): RemoteSettings = withContext(Dispatchers.IO) {
+        client().getJsonDoc(teacherToken(), SETTINGS_PATH)
+            ?.let { runCatching { Repository.json.decodeFromString<RemoteSettings>(it) }.getOrNull() } ?: RemoteSettings()
+    }
+
+    suspend fun publishSettings(settings: RemoteSettings) = withContext(Dispatchers.IO) {
+        client().putJsonDoc(teacherToken(), SETTINGS_PATH, Repository.json.encodeToString(RemoteSettings.serializer(), settings))
+    }
+
+    /** Units currently published, or null if the teacher never published. */
+    suspend fun fetchPublishedUnits(): List<StudyUnit>? = withContext(Dispatchers.IO) {
+        val t = teacherToken()
+        client().listJsonDocs(t, "units").mapNotNull { (_, json) -> runCatching { Repository.json.decodeFromString<StudyUnit>(json) }.getOrNull() }
+            .ifEmpty { null }
+    }
+
+    /** Replaces all published units and bumps the version so every tablet downloads them. Returns the new settings. */
+    suspend fun publishUnits(units: List<StudyUnit>, settings: RemoteSettings): RemoteSettings = withContext(Dispatchers.IO) {
+        val t = teacherToken()
+        val c = client()
+        val existing = c.listJsonDocs(t, "units").map { it.first }.toSet()
+        val compact = kotlinx.serialization.json.Json(Repository.json) { prettyPrint = false }
+        val newSettings = settings.copy(unitsVersion = System.currentTimeMillis())
+        val writes = units.mapIndexed { i, u -> FirebaseClient.Write("units/${u.id}", compact.encodeToString(StudyUnit.serializer(), u), i.toLong()) } +
+            (existing - units.map { it.id }.toSet()).map { FirebaseClient.Write("units/$it", null) } +
+            FirebaseClient.Write(SETTINGS_PATH, compact.encodeToString(RemoteSettings.serializer(), newSettings))
+        c.commit(t, writes)
+        newSettings
+    }
 
     // ---------- Teacher (reading results) ----------
 
@@ -121,7 +174,7 @@ class CloudSync(private val context: Context, private val endpoints: Endpoints =
 
     fun teacherSignOut() { prefs.edit().remove("teacher_refresh").remove("teacher_email").apply() }
 
-    private fun teacherToken(): String {
+    internal fun teacherToken(): String {
         val refresh = prefs.getString("teacher_refresh", null)
             ?: throw CloudException(CloudException.Kind.AUTH, "Please sign in.")
         val s = try { client().refresh(refresh, teacherSignedInEmail) } catch (e: CloudException) {
@@ -140,9 +193,11 @@ class CloudSync(private val context: Context, private val endpoints: Endpoints =
         private val lock = Any()
         private val uploadMutex = Mutex()
         private const val WORK_NAME = "upload-results"
+        private const val SETTINGS_PATH = "config/settings"
 
         /** Tests point the app at the local Firebase emulators. Never set in the real app. */
         @Volatile var endpointsOverride: Endpoints? = null
+        @Volatile var configOverride: CloudConfig? = null
 
         fun deviceName(): String = "${Build.MANUFACTURER} ${Build.MODEL}".trim()
 

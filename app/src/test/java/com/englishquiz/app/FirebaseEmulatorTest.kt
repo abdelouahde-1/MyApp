@@ -4,8 +4,8 @@ import com.englishquiz.app.data.AnswerRecord
 import com.englishquiz.app.data.CloudConfig
 import com.englishquiz.app.data.CloudException
 import com.englishquiz.app.data.Difficulty
-import com.englishquiz.app.data.Endpoints
 import com.englishquiz.app.data.FirebaseClient
+import com.englishquiz.app.data.Endpoints
 import com.englishquiz.app.data.QuizResult
 import com.englishquiz.app.data.Skill
 import org.junit.Assert.assertEquals
@@ -98,8 +98,29 @@ class FirebaseEmulatorTest {
         }
     }
 
-    @Test fun setupCodeRoundTrips() {
-        assertEquals(config, CloudConfig.fromSetupCode(config.toSetupCode()))
-        assertEquals(null, CloudConfig.fromSetupCode("rubbish"))
+    @Test fun teacherPublishesAndTabletsReadButCannotWrite() {
+        val t = teacher().idToken
+        val device = client.signUpAnonymously().idToken
+        client.commit(t, listOf(
+            FirebaseClient.Write("units/test-b", "{\"id\":\"test-b\"}", 2),
+            FirebaseClient.Write("units/test-a", "{\"id\":\"test-a\"}", 1),
+            FirebaseClient.Write("config/test", "{\"classes\":[\"A\"]}"),
+        ))
+        assertEquals("{\"classes\":[\"A\"]}", client.getJsonDoc(device, "config/test"))
+        val units = client.listJsonDocs(device, "units").filter { it.first.startsWith("test-") }
+        assertEquals(listOf("test-a", "test-b"), units.map { it.first })   // sorted by order
+        assertEquals(null, client.getJsonDoc(device, "config/does-not-exist"))
+        try {
+            client.putJsonDoc(device, "config/test", "{}"); fail("tablets must not change settings")
+        } catch (e: CloudException) {
+            assertEquals(CloudException.Kind.PERMISSION, e.kind)
+        }
+        try {
+            client.commit(device, listOf(FirebaseClient.Write("units/test-a", null))); fail("tablets must not delete units")
+        } catch (e: CloudException) {
+            assertEquals(CloudException.Kind.PERMISSION, e.kind)
+        }
+        client.commit(t, listOf(FirebaseClient.Write("units/test-a", null), FirebaseClient.Write("units/test-b", null)))
+        assertTrue(client.listJsonDocs(device, "units").none { it.first.startsWith("test-") })
     }
 }

@@ -90,6 +90,13 @@ class QuizLogicTest {
         assertEquals(ids.size, ids.toSet().size)
     }
 
+    @Test fun rulesShownToTeacherAreTheOnesTestedOnTheEmulator() {
+        val tested = javaClass.classLoader!!.getResource("emulator.rules")!!.readText()
+        val shown = com.englishquiz.app.data.CloudConfig(teacherEmail = "Teacher@Example.com ").securityRules()
+        fun norm(s: String) = s.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        assertEquals(norm(tested), norm(shown))
+    }
+
     @Test fun csvIncludesFocusAndLevel() {
         val r = QuizResult(studentName = "Smith, Ana", unitId = "u", unitTitle = "Unit 1: Youth", skill = Skill.GRAMMAR,
             difficulty = Difficulty.HARD, timestamp = 0, score = 3, total = 4, answers = emptyList())

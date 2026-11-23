@@ -108,3 +108,14 @@ data class QuizResult(
 
 @Serializable
 data class ResultsFile(val results: List<QuizResult> = emptyList())
+
+/** Settings the teacher publishes from the teacher app; every tablet downloads them. */
+@Serializable
+data class RemoteSettings(
+    /** Classes students choose from on the home screen. Empty = no class question. */
+    val classes: List<String> = emptyList(),
+    val questionsPerTest: Int = 10,
+    val instantFeedback: Boolean = false,
+    /** Changes every time the teacher publishes units; tablets re-download units when it changes. 0 = never published. */
+    val unitsVersion: Long = 0,
+)

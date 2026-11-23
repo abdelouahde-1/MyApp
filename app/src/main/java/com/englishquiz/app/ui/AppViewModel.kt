@@ -8,21 +8,23 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.englishquiz.app.data.CloudConfig
+import com.englishquiz.app.BuildConfig
+import com.englishquiz.app.data.AnswerRecord
 import com.englishquiz.app.data.CloudException
 import com.englishquiz.app.data.CloudResult
 import com.englishquiz.app.data.CloudSync
-import kotlinx.coroutines.launch
-import com.englishquiz.app.data.AnswerRecord
 import com.englishquiz.app.data.Difficulty
 import com.englishquiz.app.data.QuizEngine
 import com.englishquiz.app.data.QuizItem
 import com.englishquiz.app.data.QuizResult
+import com.englishquiz.app.data.RemoteSettings
 import com.englishquiz.app.data.Repository
 import com.englishquiz.app.data.Skill
 import com.englishquiz.app.data.StudyUnit
+import kotlinx.coroutines.launch
 
 sealed interface Screen {
+    // Student app
     data object Home : Screen
     data object Units : Screen
     data class UnitSetup(val unitId: String) : Screen
@@ -30,14 +32,15 @@ sealed interface Screen {
     data class Lesson(val unitId: String, val skill: Skill?, val difficulty: Difficulty) : Screen
     data object Quiz : Screen
     data class Result(val resultId: String, val fromTeacher: Boolean = false) : Screen
-    data object TeacherLogin : Screen
-    data object TeacherHome : Screen
-    data object TeacherResults : Screen
-    data object TeacherUnits : Screen
+
+    // Teacher app
+    data object TeacherSignIn : Screen
+    data class TeacherMain(val tab: TeacherTab = TeacherTab.RESULTS) : Screen
     data class UnitEditor(val unitId: String?) : Screen
-    data object TeacherSettings : Screen
-    data object TeacherOnline : Screen
+    data class StudentHistory(val name: String) : Screen
 }
+
+enum class TeacherTab(val label: String) { RESULTS("Results"), STATS("Statistics"), UNITS("Units"), SETTINGS("Settings") }
 
 class QuizSession(
     val unit: StudyUnit,
@@ -61,123 +64,61 @@ class QuizSession(
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
+    val isTeacher = BuildConfig.IS_TEACHER
     private val repo = Repository(app)
+    private val cloud = CloudSync(app)
 
-    val backStack = mutableStateListOf<Screen>(Screen.Home)
+    val backStack = mutableStateListOf<Screen>()
     val screen: Screen get() = backStack.last()
 
     var units by mutableStateOf(repo.loadUnits())
         private set
     var results by mutableStateOf(repo.loadResults())
         private set
+    var message by mutableStateOf<String?>(null)
+    var busy by mutableStateOf(false)
+        private set
+
+    // ---------- Settings (published by the teacher) ----------
+
+    /** Student app: the downloaded settings. Teacher app: the settings being edited/published. */
+    var settings by mutableStateOf(cloud.cachedSettings)
+        private set
+    val questionsPerTest: Int get() = settings.questionsPerTest.coerceIn(1, 50)
+
+    // ---------- Student state ----------
 
     /** Not persisted: on a shared classroom device each student types their own name. */
     var studentName by mutableStateOf("")
         private set
-    var instantFeedback by mutableStateOf(repo.instantFeedback)
+    var studentClass by mutableStateOf("")
         private set
-    var questionsPerTest by mutableIntStateOf(repo.questionsPerTest)
-        private set
-
-    /** Remembered between tests during a session so students don't re-pick each time. */
     var lastDifficulty by mutableStateOf(Difficulty.EASY)
     var lastSkill by mutableStateOf<Skill?>(null)
-
     var quiz by mutableStateOf<QuizSession?>(null)
         private set
 
-    var message by mutableStateOf<String?>(null)
+    // ---------- Teacher state ----------
 
-    // ---------- Online results ----------
-
-    private val cloud = CloudSync(app)
-    var cloudConfig by mutableStateOf(cloud.config)
-        private set
-    var className by mutableStateOf(cloud.className)
-        private set
-    var pendingUploads by mutableIntStateOf(cloud.pending().size)
-        private set
-    var cloudError by mutableStateOf(cloud.lastError)
-        private set
-    var cloudBusy by mutableStateOf(false)
-        private set
-    var teacherEmailSignedIn by mutableStateOf(cloud.teacherSignedInEmail)
+    var teacherEmail by mutableStateOf(cloud.teacherSignedInEmail)
         private set
     var onlineResults by mutableStateOf<List<CloudResult>>(emptyList())
         private set
     var onlineLoadedAt by mutableStateOf(0L)
         private set
+    /** Units edited in the teacher app but not yet published to the tablets. */
+    var unitsDirty by mutableStateOf(repo.unitsDirty)
+        private set
 
     init {
-        if (pendingUploads > 0) { CloudSync.schedule(app); trySendNow() }
-    }
-
-    private fun refreshCloudState() {
-        pendingUploads = cloud.pending().size
-        cloudError = cloud.lastError
-    }
-
-    private fun trySendNow() {
-        viewModelScope.launch {
-            runCatching { cloud.flush() }
-            refreshCloudState()
+        if (isTeacher) {
+            backStack.add(if (teacherEmail == null) Screen.TeacherSignIn else Screen.TeacherMain())
+            if (teacherEmail != null) loadTeacherData()
+        } else {
+            backStack.add(Screen.Home)
+            syncStudentDevice()
         }
     }
-
-    private fun cloudCall(onError: (CloudException) -> Unit = { message = it.message }, block: suspend () -> Unit) {
-        viewModelScope.launch {
-            cloudBusy = true
-            try { block() } catch (e: CloudException) { onError(e) } finally {
-                cloudBusy = false
-                refreshCloudState()
-                teacherEmailSignedIn = cloud.teacherSignedInEmail
-            }
-        }
-    }
-
-    fun saveCloudSettings(config: CloudConfig, cls: String) {
-        cloud.config = config
-        cloud.className = cls
-        cloudConfig = cloud.config
-        className = cloud.className
-        teacherEmailSignedIn = cloud.teacherSignedInEmail
-        if (!config.isSet) { message = "Online results turned off."; return }
-        cloudCall {
-            cloud.testConnection()
-            message = "Connected! Results from this tablet will be sent online."
-            if (cloud.pending().isNotEmpty()) cloud.flush()
-        }
-    }
-
-    fun sendPendingNow() = cloudCall {
-        val n = cloud.flush()
-        message = if (n > 0) "Sent $n result(s)." else "Nothing waiting to be sent."
-    }
-
-    fun teacherSignIn(email: String, password: String) = cloudCall {
-        cloud.teacherSignIn(email, password)
-        teacherEmailSignedIn = cloud.teacherSignedInEmail
-        loadOnlineResults()
-    }
-
-    fun teacherSignOut() {
-        cloud.teacherSignOut()
-        teacherEmailSignedIn = null
-        onlineResults = emptyList()
-    }
-
-    fun loadOnlineResults() = cloudCall {
-        onlineResults = cloud.downloadResults()
-        onlineLoadedAt = System.currentTimeMillis()
-    }
-
-    fun deleteOnlineResult(id: String) = cloudCall {
-        cloud.deleteOnline(id)
-        onlineResults = onlineResults.filterNot { it.result.id == id }
-        message = "Deleted from the online results."
-    }
-
-    fun onlineResultsCsv(filter: List<CloudResult>): String = Repository.resultsToCsv(filter.map { it.result })
 
     // ---------- Navigation ----------
 
@@ -187,11 +128,42 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun replaceTop(s: Screen) { backStack[backStack.lastIndex] = s }
 
-    fun goHome() { backStack.clear(); backStack.add(Screen.Home) }
+    fun goHome() { backStack.clear(); backStack.add(if (isTeacher) Screen.TeacherMain() else Screen.Home) }
+
+    fun selectTab(tab: TeacherTab) { backStack.clear(); backStack.add(Screen.TeacherMain(tab)) }
+
+    private fun launchCloud(quiet: Boolean = false, block: suspend () -> Unit) {
+        viewModelScope.launch {
+            busy = true
+            try { block() } catch (e: CloudException) {
+                if (!quiet) message = e.message
+                if (e.kind == CloudException.Kind.AUTH && isTeacher && cloud.teacherSignedInEmail == null) {
+                    teacherEmail = null
+                    backStack.clear(); backStack.add(Screen.TeacherSignIn)
+                }
+            } finally { busy = false }
+        }
+    }
 
     // ---------- Student ----------
 
+    /** Sends waiting results and downloads the teacher's latest settings and units. Silent when offline. */
+    fun syncStudentDevice() = launchCloud(quiet = true) {
+        if (cloud.pending().isNotEmpty()) { CloudSync.schedule(getApplication()); runCatching { cloud.flush() } }
+        val newUnits = cloud.syncFromTeacher()
+        settings = cloud.cachedSettings
+        if (newUnits != null) {
+            units = newUnits
+            repo.saveUnits(newUnits)
+        }
+        if (studentClass.isNotBlank() && studentClass !in settings.classes) studentClass = ""
+    }
+
     fun setStudent(name: String) { studentName = name }
+
+    fun selectClass(c: String) { studentClass = c }
+
+    val canStart: Boolean get() = studentName.isNotBlank() && (settings.classes.isEmpty() || studentClass.isNotBlank())
 
     fun unitById(id: String): StudyUnit? = units.firstOrNull { it.id == id }
 
@@ -205,7 +177,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun startQuiz(unit: StudyUnit, skill: Skill?, difficulty: Difficulty) {
         val items = QuizEngine.prepare(unit, skill, difficulty, questionsPerTest)
         if (items.isEmpty()) { message = "No questions for this choice yet."; return }
-        quiz = QuizSession(unit, skill, difficulty, items, instantFeedback)
+        quiz = QuizSession(unit, skill, difficulty, items, settings.instantFeedback)
         navigate(Screen.Quiz)
     }
 
@@ -217,9 +189,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         q.answers += q.feedback ?: QuizEngine.grade(q.current, q.selected, q.typed)
-        if (q.isLast) {
-            finishQuiz(q)
-        } else {
+        if (q.isLast) finishQuiz(q) else {
             q.index++
             q.selected = null
             q.typed = ""
@@ -238,15 +208,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             score = q.answers.count { it.correct },
             total = q.answers.size,
             answers = q.answers.toList(),
-            className = className,
+            className = studentClass,
         )
         results = results + result
         repo.saveResults(results)
-        cloud.enqueue(result)
-        refreshCloudState()
-        if (cloudConfig.isSet) trySendNow()
         quiz = null
         replaceTop(Screen.Result(result.id))
+        cloud.enqueue(result)
+        launchCloud(quiet = true) { cloud.flush() }
     }
 
     fun abandonQuiz() {
@@ -254,43 +223,79 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         back()
     }
 
-    // ---------- Teacher ----------
+    // ---------- Teacher: account ----------
 
-    fun checkPin(pin: String): Boolean = pin == repo.teacherPin
+    fun teacherSignIn(email: String, password: String) = launchCloud {
+        cloud.teacherSignIn(email, password)
+        teacherEmail = cloud.teacherSignedInEmail
+        backStack.clear(); backStack.add(Screen.TeacherMain())
+        loadTeacherDataNow()
+    }
 
-    fun changePin(newPin: String) { repo.teacherPin = newPin }
+    fun teacherSignOut() {
+        cloud.teacherSignOut()
+        teacherEmail = null
+        onlineResults = emptyList()
+        onlineLoadedAt = 0
+        backStack.clear(); backStack.add(Screen.TeacherSignIn)
+    }
 
-    fun updateInstantFeedback(v: Boolean) { instantFeedback = v; repo.instantFeedback = v }
+    fun securityRules(): String = cloud.config.copy(teacherEmail = teacherEmail.orEmpty()).securityRules()
 
-    fun updateQuestionsPerTest(v: Int) { questionsPerTest = v; repo.questionsPerTest = v }
+    private fun loadTeacherData() = launchCloud { loadTeacherDataNow() }
 
-    fun saveUnit(unit: StudyUnit) {
-        units = (if (units.any { it.id == unit.id }) units.map { if (it.id == unit.id) unit else it } else units + unit)
-            .sortedWith(compareBy({ it.number == 0 }, { it.number }))
+    private suspend fun loadTeacherDataNow() {
+        settings = cloud.fetchSettings()
+        if (!unitsDirty) {
+            cloud.fetchPublishedUnits()?.let { published ->
+                units = published
+                repo.saveUnits(published)
+            }
+        }
+        onlineResults = cloud.downloadResults()
+        onlineLoadedAt = System.currentTimeMillis()
+    }
+
+    fun refreshTeacherData() = launchCloud { loadTeacherDataNow() }
+
+    // ---------- Teacher: results ----------
+
+    fun deleteOnlineResult(id: String) = launchCloud {
+        cloud.deleteOnline(id)
+        onlineResults = onlineResults.filterNot { it.result.id == id }
+        message = "Result deleted."
+    }
+
+    fun resultsCsv(list: List<QuizResult>): String = Repository.resultsToCsv(list)
+
+    // ---------- Teacher: settings ----------
+
+    fun publishSettings(newSettings: RemoteSettings) = launchCloud {
+        val s = newSettings.copy(unitsVersion = settings.unitsVersion)
+        cloud.publishSettings(s)
+        settings = s
+        message = "Settings saved. Tablets get them next time the app opens."
+    }
+
+    // ---------- Teacher: units ----------
+
+    private fun replaceUnits(newUnits: List<StudyUnit>) {
+        units = newUnits.sortedWith(compareBy({ it.number == 0 }, { it.number }))
         repo.saveUnits(units)
+        repo.unitsDirty = true
+        unitsDirty = true
     }
 
-    fun deleteUnit(id: String) {
-        units = units.filterNot { it.id == id }
-        repo.saveUnits(units)
-    }
+    fun saveUnit(unit: StudyUnit) =
+        replaceUnits(if (units.any { it.id == unit.id }) units.map { if (it.id == unit.id) unit else it } else units + unit)
 
-    fun deleteResult(id: String) {
-        results = results.filterNot { it.id == id }
-        repo.saveResults(results)
-    }
-
-    fun clearResults() {
-        results = emptyList()
-        repo.saveResults(results)
-    }
+    fun deleteUnit(id: String) = replaceUnits(units.filterNot { it.id == id })
 
     fun restoreBuiltInUnits() {
         val builtIn = repo.loadBuiltInUnits()
         val ids = builtIn.map { it.id }.toSet()
-        units = (builtIn + units.filterNot { it.id in ids }).sortedWith(compareBy({ it.number == 0 }, { it.number }))
-        repo.saveUnits(units)
-        message = "Built-in units restored."
+        replaceUnits(builtIn + units.filterNot { it.id in ids })
+        message = "Built-in units restored. Publish to send them to the tablets."
     }
 
     /** Merges units from a JSON file; units with the same id are replaced. */
@@ -298,14 +303,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { Repository.parseUnits(text) }
             .onSuccess { imported ->
                 val ids = imported.map { it.id }.toSet()
-                units = (units.filterNot { it.id in ids } + imported).sortedWith(compareBy({ it.number == 0 }, { it.number }))
-                repo.saveUnits(units)
-                message = "Imported ${imported.size} unit(s)."
+                replaceUnits(units.filterNot { it.id in ids } + imported)
+                message = "Imported ${imported.size} unit(s). Publish to send them to the tablets."
             }
             .onFailure { message = "Could not read that file: ${it.message?.take(120)}" }
     }
 
     fun unitsJson(): String = Repository.unitsToJson(units)
 
-    fun resultsCsv(): String = Repository.resultsToCsv(results)
+    fun publishUnits() = launchCloud {
+        settings = cloud.publishUnits(units, settings)
+        repo.unitsDirty = false
+        unitsDirty = false
+        message = "Published! Tablets download the new units next time the app opens."
+    }
+
+    fun discardUnitChanges() = launchCloud {
+        val published = cloud.fetchPublishedUnits() ?: repo.loadBuiltInUnits()
+        units = published
+        repo.saveUnits(published)
+        repo.unitsDirty = false
+        unitsDirty = false
+        message = "Changes discarded."
+    }
 }

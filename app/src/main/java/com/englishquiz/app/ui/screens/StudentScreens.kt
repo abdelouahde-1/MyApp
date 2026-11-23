@@ -63,15 +63,8 @@ import com.englishquiz.app.ui.theme.WrongRed
 
 @Composable
 fun HomeScreen(vm: AppViewModel) {
-    val canStart = vm.studentName.isNotBlank()
-    AppScaffold(
-        vm, title = "English Lesson Quiz", onBack = null,
-        actions = {
-            IconButton(onClick = { vm.navigate(Screen.TeacherLogin) }) {
-                Icon(Icons.Filled.Lock, contentDescription = "Teacher area")
-            }
-        },
-    ) { pad ->
+    val go = { if (vm.canStart) vm.navigate(Screen.Units) }
+    AppScaffold(vm, title = "English Quiz", onBack = null) { pad ->
         Column(
             Modifier.padding(pad).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -91,18 +84,38 @@ fun HomeScreen(vm: AppViewModel) {
                 label = { Text("Your name") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Go),
-                keyboardActions = KeyboardActions(onGo = { if (canStart) vm.navigate(Screen.Units) }),
+                keyboardActions = KeyboardActions(onGo = { go() }),
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(16.dp))
+            if (vm.settings.classes.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                Text("Your class", style = MaterialTheme.typography.titleSmall, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(6.dp))
+                @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    vm.settings.classes.forEach { c ->
+                        androidx.compose.material3.FilterChip(
+                            selected = vm.studentClass == c, onClick = { vm.selectClass(c) },
+                            label = { Text(c, style = MaterialTheme.typography.bodyLarge) },
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(20.dp))
             Button(
-                onClick = { vm.navigate(Screen.Units) },
-                enabled = canStart,
+                onClick = go,
+                enabled = vm.canStart,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) { Text("Start") }
-            if (!canStart) {
+            if (!vm.canStart) {
                 Spacer(Modifier.height(8.dp))
-                Text("Type your name to begin.", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    if (vm.studentName.isBlank()) "Type your name to begin." else "Choose your class.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }

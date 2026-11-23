@@ -39,17 +39,10 @@ class Repository(private val context: Context) {
 
     // ---------- Settings ----------
 
-    var teacherPin: String
-        get() = prefs.getString("pin", DEFAULT_PIN) ?: DEFAULT_PIN
-        set(value) = prefs.edit().putString("pin", value).apply()
-
-    var instantFeedback: Boolean
-        get() = prefs.getBoolean("instant_feedback", false)
-        set(value) = prefs.edit().putBoolean("instant_feedback", value).apply()
-
-    var questionsPerTest: Int
-        get() = prefs.getInt("questions_per_test", DEFAULT_QUESTIONS)
-        set(value) = prefs.edit().putInt("questions_per_test", value).apply()
+    /** Teacher app: units edited locally but not yet published. */
+    var unitsDirty: Boolean
+        get() = prefs.getBoolean("units_dirty", false)
+        set(value) = prefs.edit().putBoolean("units_dirty", value).apply()
 
     private fun writeAtomic(file: File, text: String) {
         val tmp = File(file.parentFile, file.name + ".tmp")
@@ -61,8 +54,6 @@ class Repository(private val context: Context) {
     }
 
     companion object {
-        const val DEFAULT_PIN = "1234"
-        const val DEFAULT_QUESTIONS = 10
         val QUESTION_COUNT_CHOICES = listOf(5, 10, 15, 20)
 
         val json = Json {
