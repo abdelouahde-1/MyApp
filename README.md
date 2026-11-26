@@ -69,3 +69,29 @@ In those files, `mc(level, prompt, [correct, wrong, …])` is a multiple-choice 
 In lesson text, `# ` starts a heading, `• ` starts a bullet, and `**word**` is bold.
 
 Built-in units are used until the teacher publishes units from the teacher app. After that, the tablets use the published version.
+
+---
+
+# Classic Book (Android)
+
+A separate app in `book/` that turns any `.txt` file into a classic printed book: yellowish parchment pages,
+EB Garamond text, IM Fell English titles, a red drop cap at each chapter, justified and hyphenated paragraphs,
+running headers and page numbers.
+
+- **Open a text file** (or use *Open with* / *Share* from a file manager). UTF-8, UTF-16 and old Windows files all work.
+- Chapters start on a new page when a line reads `Chapter 1`, `CHAPTER IV`, `Prologue`, `Part Two` or just `XII`.
+  A short line right after it becomes the chapter's name. A line of `* * *` is a scene break.
+- A first line `Title` followed by `by Author` becomes the title page (you can also edit both in the ⋮ menu).
+- Straight quotes become curly quotes, `--` becomes an em dash and `...` an ellipsis.
+- **Aa** changes the text size, the list icon opens the contents, and ⋮ → **Save as PDF** writes the book as a 5.5 × 8.5 in PDF.
+
+![A chapter opening](docs/classic-book-page.png)
+
+Install: in **Actions**, open the latest **Build APKs** run and download **classic-book-apk**.
+
+```
+./gradlew :book:testDebugUnitTest :book:assembleDebug   # APK in book/build/outputs/apk/debug/
+./gradlew :book:recordRoborazziDebug                    # screenshots in book/build/outputs/roborazzi/
+```
+
+Fonts: EB Garamond and IM Fell English, SIL Open Font License (see `book/FONT-LICENSE-*.txt`).

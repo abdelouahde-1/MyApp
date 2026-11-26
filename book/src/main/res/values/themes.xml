@@ -1,0 +1,8 @@
+<resources>
+    <color name="parchment">#F3E7C9</color>
+    <color name="ic_launcher_background">#7A2E1F</color>
+    <style name="Theme.ClassicBook" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/parchment</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+</resources>
