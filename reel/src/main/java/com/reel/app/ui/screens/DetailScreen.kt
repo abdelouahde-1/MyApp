@@ -388,7 +388,7 @@ private fun StreamsSheet(nav: NavController, meta: Meta, video: Video, onDismiss
                 }
                 else -> {
                     // Only sources Reel can actually open are listed.
-                    fun keep(st: Stream) = st.kind != Stream.Kind.Unsupported
+                    fun keep(st: Stream) = true
                     val counts = remember(g) {
                         g.flatMap { it.streams.filter(::keep) }.groupingBy { StreamSorting.info(it).quality }.eachCount()
                     }
