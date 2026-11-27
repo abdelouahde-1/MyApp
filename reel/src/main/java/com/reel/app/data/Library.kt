@@ -148,6 +148,7 @@ object LibraryRules {
 /** Library persisted as one JSON file; every change is written in the background. */
 class LibraryRepository(private val file: File, private val scope: CoroutineScope) {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val io = Dispatchers.IO.limitedParallelism(1) // writes run one at a time, in order
     private val _state = MutableStateFlow(load())
     val state: StateFlow<LibraryState> = _state.asStateFlow()
@@ -161,7 +162,9 @@ class LibraryRepository(private val file: File, private val scope: CoroutineScop
         scope.launch(io) { runCatching { file.writeText(json.encodeToString(LibraryState.serializer(), snapshot)) } }
     }
 
-    fun exportJson(): String = Json { prettyPrint = true }.encodeToString(LibraryState.serializer(), state.value)
+    private val pretty = Json { prettyPrint = true }
+
+    fun exportJson(): String = pretty.encodeToString(LibraryState.serializer(), state.value)
 
     /** Merges an exported library into this one (imported flags win). */
     fun importJson(text: String) {

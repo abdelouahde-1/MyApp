@@ -23,6 +23,7 @@ class AddonRepository(
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     private val raw = java.util.concurrent.ConcurrentHashMap<String, String>()
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val io = kotlinx.coroutines.Dispatchers.IO.limitedParallelism(1)
     private val _addons = MutableStateFlow<List<Addon>>(emptyList())
     val addons: StateFlow<List<Addon>> = _addons.asStateFlow()

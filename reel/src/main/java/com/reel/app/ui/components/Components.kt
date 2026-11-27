@@ -118,11 +118,12 @@ fun PosterCard(
     val lib by LocalApp.current.library.state.collectAsState()
     val item = lib[preview.id]
     val haptics = LocalHapticFeedback.current
-    Column(if (width != null) modifier.width(width) else modifier) {
-        Box(
-            Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)).background(ReelColors.Surface)
-                .combinedClickable(onClick = onClick, onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); onLongClick() }),
-        ) {
+    // The whole card (poster + title) is the touch target.
+    Column(
+        (if (width != null) modifier.width(width) else modifier).clip(RoundedCornerShape(12.dp))
+            .combinedClickable(onClick = onClick, onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); onLongClick() }),
+    ) {
+        Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)).background(ReelColors.Surface)) {
             if (preview.poster != null) {
                 AsyncImage(preview.poster, preview.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             } else {

@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.reel.app.data.Http
 import org.junit.Assert.assertEquals
@@ -75,7 +76,8 @@ class AppFlowTest {
         rule.waitForIdle()
         shot("2-quick-actions")
         assertTrue(app.library.state.value["tt102"]!!.watchlist)
-        rule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        Espresso.pressBack() // closes the sheet
+        rule.waitForIdle()
 
         // Series detail with seasons and episodes.
         rule.onAllNodesWithText("The Long Road").onFirst().performClick()
@@ -90,10 +92,13 @@ class AppFlowTest {
         rule.onNodeWithText("Play S1E2").performClick()
         waitFor("Sample 1080p")
         shot("4-sources")
-        rule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        Espresso.pressBack()
         rule.waitForIdle()
         rule.onNodeWithText("Favorite").performClick()
-        rule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        rule.waitForIdle()
+        assertTrue(app.library.state.value["tt200"]!!.favorite)
+        Espresso.pressBack()
+        rule.waitForIdle()
 
         // Library shows watchlist by default; favorites tab has the series.
         rule.onNodeWithText("Library").performClick()

@@ -25,7 +25,7 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.ViewList
+import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -121,7 +121,7 @@ fun LibraryScreen(nav: NavController) {
                 ShelfChip(s.label, lib.shelf(s.name).size, s.icon, shelf == s.name) { selectedShelf = s.name }
             }
             items(lib.lists) { name ->
-                ShelfChip(name, lib.list(name).size, Icons.Rounded.ViewList, shelf == "list:$name") { selectedShelf = "list:$name" }
+                ShelfChip(name, lib.list(name).size, Icons.AutoMirrored.Rounded.ViewList, shelf == "list:$name") { selectedShelf = "list:$name" }
             }
             item {
                 FilterChip(selected = false, onClick = { dialog = "new" }, label = { Text("New list") }, leadingIcon = { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)) })
@@ -151,7 +151,7 @@ fun LibraryScreen(nav: NavController) {
                 Shelf.Watched.name -> "Nothing watched yet" to "Finished titles are marked automatically. You can also mark them yourself."
                 else -> "This list is empty" to "Long-press a poster and pick this list to add titles."
             }
-            EmptyState(Shelf.entries.firstOrNull { it.name == shelf }?.icon ?: Icons.Rounded.ViewList, title, body, Modifier.padding(top = 40.dp))
+            EmptyState(Shelf.entries.firstOrNull { it.name == shelf }?.icon ?: Icons.AutoMirrored.Rounded.ViewList, title, body, Modifier.padding(top = 40.dp))
         } else {
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(108.dp),
