@@ -12,8 +12,8 @@ data class Settings(
     val autoplayNext: Boolean = true,
     /** Preferred subtitle language (ISO 639-2, e.g. "eng"), empty = off. */
     val subtitleLang: String = "",
-    /** Hide streams the app cannot play (torrents) instead of listing them greyed out. */
-    val hideUnsupported: Boolean = true,
+    /** Hide torrent sources (they open in another app, not in Reel's player). */
+    val hideUnsupported: Boolean = false,
 )
 
 class SettingsRepository(context: Context) {
@@ -23,7 +23,7 @@ class SettingsRepository(context: Context) {
             externalPlayer = prefs.getBoolean("externalPlayer", false),
             autoplayNext = prefs.getBoolean("autoplayNext", true),
             subtitleLang = prefs.getString("subtitleLang", "") ?: "",
-            hideUnsupported = prefs.getBoolean("hideUnsupported", true),
+            hideUnsupported = prefs.getBoolean("hideTorrents", false),
         )
     )
     val state: StateFlow<Settings> = _state.asStateFlow()
@@ -35,7 +35,7 @@ class SettingsRepository(context: Context) {
             .putBoolean("externalPlayer", s.externalPlayer)
             .putBoolean("autoplayNext", s.autoplayNext)
             .putString("subtitleLang", s.subtitleLang)
-            .putBoolean("hideUnsupported", s.hideUnsupported)
+            .putBoolean("hideTorrents", s.hideUnsupported)
             .apply()
     }
 }

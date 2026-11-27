@@ -36,7 +36,8 @@ object AddonUrls {
         val extraPart = extra.filterValues { it.isNotEmpty() }.entries
             .joinToString("&") { (k, v) -> "${enc(k)}=${enc(v)}" }
             .let { if (it.isEmpty()) "" else "/$it" }
-        return "$base/$resource/${enc(type)}/${enc(id)}$extraPart.json"
+        // Ids keep their ':' separators (tt123:1:2): that is what add-ons expect, and some don't decode %3A.
+        return "$base/$resource/${enc(type)}/${enc(id).replace("%3A", ":")}$extraPart.json"
     }
 }
 
@@ -50,6 +51,7 @@ class UrlConnectionHttp : Http {
         c.connectTimeout = 10_000
         c.readTimeout = 20_000
         c.setRequestProperty("Accept", "application/json")
+        c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) Reel/1.0")
         try {
             if (c.responseCode !in 200..299) error("HTTP ${c.responseCode} for $url")
             c.inputStream.bufferedReader().use { it.readText() }

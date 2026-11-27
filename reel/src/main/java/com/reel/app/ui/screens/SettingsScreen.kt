@@ -165,7 +165,7 @@ fun SettingsScreen(nav: NavController) {
         item {
             SwitchRow("Use another video player", "Open streams in VLC, MX Player or similar instead of Reel's player.", settings.externalPlayer) { v -> app.settings.update { it.copy(externalPlayer = v) } }
             SwitchRow("Offer next episode", "When an episode ends, suggest the next one.", settings.autoplayNext) { v -> app.settings.update { it.copy(autoplayNext = v) } }
-            SwitchRow("Hide unplayable sources", "Hide stream types Reel can't play (such as torrents).", settings.hideUnsupported) { v -> app.settings.update { it.copy(hideUnsupported = v) } }
+            SwitchRow("Hide torrent sources", "Torrent sources open in another app (such as Stremio or a torrent client), not in Reel's player.", settings.hideUnsupported) { v -> app.settings.update { it.copy(hideUnsupported = v) } }
             Text("Subtitles", modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 6.dp))
             FlowRow(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 subtitleLanguages.forEach { (code, label) ->

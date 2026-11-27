@@ -138,6 +138,7 @@ fun DetailScreen(nav: NavController, type: String, id: String, savedState: Saved
 
     /** What the big button plays: the in-progress video, else the first unwatched episode, else the movie. */
     val primary: Video? = when {
+        m == null && meta != null && type == "movie" -> Video(id, preview.name, null, null, null, null, null)
         m == null -> null
         !isSeries -> Video(m.id, m.name, null, null, null, null, null)
         else -> m.videos.firstOrNull { it.id == resumeVideo }
@@ -257,7 +258,10 @@ fun DetailScreen(nav: NavController, type: String, id: String, savedState: Saved
     }
 
     if (lists) QuickActionsSheet(preview, onDismiss = { lists = false })
-    streamsFor?.let { v -> if (m != null) StreamsSheet(nav, m, v, onDismiss = { streamsFor = null }) }
+    streamsFor?.let { v ->
+        val forSheet = m ?: Meta(preview.copy(name = preview.name.ifBlank { id }), null, null, emptyList(), emptyList(), emptyList(), emptyList())
+        StreamsSheet(nav, forSheet, v, onDismiss = { streamsFor = null })
+    }
 }
 
 @Composable
@@ -325,6 +329,16 @@ fun openUrl(context: Context, url: String) {
     }
 }
 
+/** Hands a torrent source to whichever installed app handles magnet links. */
+fun openTorrent(context: Context, magnet: String) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(magnet))
+    try {
+        context.startActivity(Intent.createChooser(intent, "Open torrent with"))
+    } catch (e: ActivityNotFoundException) {
+        Toast.makeText(context, "Install an app that opens magnet links (e.g. Stremio or a torrent client)", Toast.LENGTH_LONG).show()
+    }
+}
+
 fun openInExternalPlayer(context: Context, url: String, title: String) {
     val intent = Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(url), "video/*").putExtra("title", title)
     try {
@@ -350,7 +364,8 @@ private fun StreamsSheet(nav: NavController, meta: Meta, video: Video, onDismiss
         when (stream.kind) {
             Stream.Kind.YouTube -> openYouTube(context, stream.ytId!!)
             Stream.Kind.External -> openUrl(context, stream.externalUrl!!)
-            Stream.Kind.Unsupported -> Toast.makeText(context, "This kind of stream isn't supported", Toast.LENGTH_SHORT).show()
+            Stream.Kind.Torrent -> openTorrent(context, stream.magnet!!)
+            Stream.Kind.Unsupported -> Toast.makeText(context, "This source has no link Reel can open", Toast.LENGTH_SHORT).show()
             Stream.Kind.Direct -> if (external) {
                 openInExternalPlayer(context, stream.url!!, title)
             } else {
@@ -378,10 +393,18 @@ private fun StreamsSheet(nav: NavController, meta: Meta, video: Video, onDismiss
                 }
                 else -> LazyColumn(Modifier.fillMaxWidth().height(520.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
                     g.forEach { group ->
-                        val streams = group.streams.filter { !settings.hideUnsupported || it.kind != Stream.Kind.Unsupported }
+                        val streams = group.streams
+                            .filter { it.kind != Stream.Kind.Unsupported && !(settings.hideUnsupported && it.kind == Stream.Kind.Torrent) }
+                            .sortedBy { it.kind == Stream.Kind.Torrent } // directly playable sources first
+                        val hidden = group.streams.size - streams.size
                         item(key = "h-${group.addonName}") {
                             Text(
-                                group.addonName + (group.error?.let { " · unavailable" } ?: if (streams.isEmpty()) " · nothing found" else ""),
+                                group.addonName + when {
+                                    group.error != null -> " · couldn't reach it (${group.error})"
+                                    streams.isEmpty() && hidden > 0 -> " · $hidden torrent sources hidden (Settings)"
+                                    streams.isEmpty() -> " · nothing found for this title"
+                                    else -> " · ${streams.size}"
+                                },
                                 style = MaterialTheme.typography.labelSmall, color = ReelColors.Muted,
                                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 4.dp),
                             )
@@ -413,7 +436,8 @@ private fun StreamRow(s: Stream, preferExternal: Boolean, onPlay: (external: Boo
         Column(Modifier.weight(1f)) {
             Text(s.headline, maxLines = 1, overflow = TextOverflow.Ellipsis, color = if (supported) ReelColors.Text else ReelColors.Muted)
             if (s.details.isNotEmpty()) Text(s.details, style = MaterialTheme.typography.bodySmall, color = ReelColors.Muted, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            if (!supported) Text("Not playable in Reel", style = MaterialTheme.typography.labelSmall, color = ReelColors.Muted)
+            if (s.kind == Stream.Kind.Torrent) Text("Torrent · opens in another app", style = MaterialTheme.typography.labelSmall, color = ReelColors.Accent)
+            if (!supported) Text("No playable link", style = MaterialTheme.typography.labelSmall, color = ReelColors.Muted)
         }
         if (s.kind == Stream.Kind.Direct) IconButton(onClick = { onPlay(!preferExternal) }) {
             Icon(Icons.AutoMirrored.Rounded.OpenInNew, if (preferExternal) "Play in Reel" else "Open in another player", tint = ReelColors.Muted)

@@ -42,7 +42,7 @@ class ProtocolTest {
             "https://h/catalog/movie/top/genre=Sci-Fi%20%26%20Fantasy&skip=100.json",
             AddonUrls.resource("https://h", "catalog", "movie", "top", linkedMapOf("genre" to "Sci-Fi & Fantasy", "skip" to "100", "search" to "")),
         )
-        assertEquals("https://h/stream/series/tt1%3A2%3A3.json", AddonUrls.resource("https://h", "stream", "series", "tt1:2:3"))
+        assertEquals("https://h/stream/series/tt1:2:3.json", AddonUrls.resource("https://h", "stream", "series", "tt1:2:3"))
     }
 
     @Test fun parsesManifestResourcesAndCatalogs() {
@@ -85,7 +85,10 @@ class ProtocolTest {
     @Test fun classifiesStreams() {
         assertEquals(Stream.Kind.Direct, Stream.parse(obj("""{"url":"https://x/a.mp4","name":"HD"}"""), "A").kind)
         assertEquals(Stream.Kind.YouTube, Stream.parse(obj("""{"ytId":"q"}"""), "A").kind)
-        assertEquals(Stream.Kind.Unsupported, Stream.parse(obj("""{"infoHash":"ff"}"""), "A").kind)
+        assertEquals(Stream.Kind.Unsupported, Stream.parse(obj("""{"name":"nothing"}"""), "A").kind)
+        val t = Stream.parse(obj("""{"infoHash":"ff00","name":"T 1080p","title":"Big File.mkv\n2 GB","sources":["tracker:udp://tr.example:80","dht:ff00"]}"""), "A")
+        assertEquals(Stream.Kind.Torrent, t.kind)
+        assertEquals("magnet:?xt=urn:btih:ff00&dn=Big+File.mkv&tr=udp%3A%2F%2Ftr.example%3A80", t.magnet)
         val s = Stream.parse(obj("""{"url":"u","behaviorHints":{"proxyHeaders":{"request":{"Referer":"r"}}},"subtitles":[{"url":"s.srt","lang":"eng"}]}"""), "A")
         assertEquals(mapOf("Referer" to "r"), s.headers)
         assertEquals("eng", s.subtitles.single().lang)
