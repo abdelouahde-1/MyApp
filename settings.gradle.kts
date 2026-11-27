@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 rootProject.name = "EnglishLessonQuiz"
 include(":app")
 include(":reel")
+include(":player")

@@ -9,6 +9,7 @@ Two Android apps for testing 2nd-year Baccalaureate (2BAC) students on the ten u
 ![Screenshots: student home with classes, results, statistics, student progress, settings, units](docs/screenshots.png)
 
 > This repo also contains **[Reel](reel/README.md)**, a separate add-on based movie & series app (`:reel` module).
+> And **[Reel Player](player/README.md)**, a standalone video player app (`:player` module).
 
 Firebase setup (one time, about 15 minutes): **[docs/ONLINE_RESULTS_SETUP.md](docs/ONLINE_RESULTS_SETUP.md)**.
 
