@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.printToString
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -61,7 +62,17 @@ class AppFlowTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
     private fun shot(name: String) = rule.onRoot().captureRoboImage("build/outputs/roborazzi/$name.png")
-    private fun waitFor(text: String) = rule.waitUntil(5_000) { rule.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitFor(text: String) {
+        try {
+            rule.waitUntil(5_000) { rule.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        } catch (e: Throwable) {
+            // Dump every window's UI tree so CI logs show what was on screen.
+            val tree = rule.onAllNodes(androidx.compose.ui.test.isRoot()).fetchSemanticsNodes().indices.joinToString("\n---\n") { i ->
+                rule.onAllNodes(androidx.compose.ui.test.isRoot())[i].printToString()
+            }
+            throw AssertionError("\"$text\" never appeared. Screen:\n$tree", e)
+        }
+    }
 
     @Test fun browseSaveAndOrganize() {
         // Default add-on list is replaced by our fake add-on on first launch.
