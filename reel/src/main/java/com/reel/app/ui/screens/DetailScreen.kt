@@ -387,7 +387,7 @@ private fun StreamsSheet(nav: NavController, meta: Meta, video: Video, onDismiss
                     TextButton(onClick = { onDismiss(); nav.navigate("settings") }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Open add-ons") }
                 }
                 else -> {
-                    // Only sources Reel can actually open are listed.
+                    // Every source is listed, including ones Reel can't open (those show a "no playable link" note).
                     fun keep(st: Stream) = true
                     val counts = remember(g) {
                         g.flatMap { it.streams.filter(::keep) }.groupingBy { StreamSorting.info(it).quality }.eachCount()

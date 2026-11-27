@@ -110,7 +110,7 @@ class AppFlowTest {
         shot("4-sources")
         rule.onNodeWithText("4K 1").performClick()
         waitFor("Big.2160p.mkv")
-        rule.onNodeWithText("All 3").performClick()
+        rule.onNodeWithText("All 4").performClick()
         waitFor("Small.720p.mkv")
         shot("4b-sources-all")
         Espresso.pressBack()
