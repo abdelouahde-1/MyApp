@@ -39,7 +39,7 @@ object FakeAddon : Http {
         url.contains("/meta/series/tt200") -> """{"meta":{"id":"tt200","type":"series","name":"The Long Road","releaseInfo":"2019–","imdbRating":"8.4","genres":["Drama","Mystery"],
             "description":"Two strangers drive across a continent and slowly find out why they were both invited.","runtime":"52 min","cast":["A. Actor","B. Actor"],"videos":[$episodes]}}"""
         url.contains("/meta/") -> """{"meta":{"id":"tt101","type":"movie","name":"Movie 1","releaseInfo":"2021","description":"A movie."}}"""
-        url.contains("/stream/") -> """{"streams":[{"name":"Sample 1080p","title":"Open demo video\nH.264 · 1.2 GB","url":"https://example.com/demo.mp4"},{"name":"Sample","title":"Torrent","infoHash":"abc"}]}"""
+        url.contains("/stream/") -> """{"streams":[{"name":"Sample 1080p","title":"Open demo video\n💾 1.2 GB","url":"https://example.com/demo.mp4"},{"name":"Sample\n720p","title":"Small.720p.mkv\n👤 5 💾 700 MB","infoHash":"abc"},{"name":"Sample\n4k","title":"Big.2160p.mkv\n👤 9 💾 15 GB","infoHash":"def"}]}"""
         else -> "{}"
     }
 }
@@ -105,7 +105,14 @@ class AppFlowTest {
         waitFor("Play S1E2")
         rule.onNodeWithText("Play S1E2").performClick()
         waitFor("Sample 1080p")
+        // Opens on the default 1080p tab: the 720p and 4K sources are in other tabs.
+        assertTrue(rule.onAllNodes(hasText("Small.720p.mkv", substring = true)).fetchSemanticsNodes().isEmpty())
         shot("4-sources")
+        rule.onNodeWithText("4K 1").performClick()
+        waitFor("Big.2160p.mkv")
+        rule.onNodeWithText("All 3").performClick()
+        waitFor("Small.720p.mkv")
+        shot("4b-sources-all")
         Espresso.pressBack()
         rule.waitForIdle()
         rule.onNodeWithText("Favorite").performClick()

@@ -166,6 +166,13 @@ fun SettingsScreen(nav: NavController) {
             SwitchRow("Use another video player", "Open streams in VLC, MX Player or similar instead of Reel's player.", settings.externalPlayer) { v -> app.settings.update { it.copy(externalPlayer = v) } }
             SwitchRow("Offer next episode", "When an episode ends, suggest the next one.", settings.autoplayNext) { v -> app.settings.update { it.copy(autoplayNext = v) } }
             SwitchRow("Hide torrent sources", "Torrent sources open in another app (such as Stremio or a torrent client), not in Reel's player.", settings.hideUnsupported) { v -> app.settings.update { it.copy(hideUnsupported = v) } }
+            Text("Default quality", modifier = Modifier.padding(start = 20.dp, top = 12.dp))
+            Text("The source list opens on this quality when it's available.", style = MaterialTheme.typography.bodySmall, color = ReelColors.Muted, modifier = Modifier.padding(start = 20.dp, bottom = 6.dp))
+            FlowRow(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                com.reel.app.data.Quality.entries.filter { it != com.reel.app.data.Quality.Unknown }.forEach { q ->
+                    FilterChip(selected = settings.preferredQuality == q.label, onClick = { app.settings.update { it.copy(preferredQuality = q.label) } }, label = { Text(q.label) })
+                }
+            }
             Text("Subtitles", modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 6.dp))
             FlowRow(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 subtitleLanguages.forEach { (code, label) ->

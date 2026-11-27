@@ -14,6 +14,10 @@ data class Settings(
     val subtitleLang: String = "",
     /** Hide torrent sources (they open in another app, not in Reel's player). */
     val hideUnsupported: Boolean = false,
+    /** Quality tab the source list opens on ("1080p", "4K", ...). */
+    val preferredQuality: String = "1080p",
+    /** How sources are ordered (a [StreamSort] name). */
+    val streamSort: String = "Default",
 )
 
 class SettingsRepository(context: Context) {
@@ -24,6 +28,8 @@ class SettingsRepository(context: Context) {
             autoplayNext = prefs.getBoolean("autoplayNext", true),
             subtitleLang = prefs.getString("subtitleLang", "") ?: "",
             hideUnsupported = prefs.getBoolean("hideTorrents", false),
+            preferredQuality = prefs.getString("preferredQuality", "1080p") ?: "1080p",
+            streamSort = prefs.getString("streamSort", "Default") ?: "Default",
         )
     )
     val state: StateFlow<Settings> = _state.asStateFlow()
@@ -36,6 +42,8 @@ class SettingsRepository(context: Context) {
             .putBoolean("autoplayNext", s.autoplayNext)
             .putString("subtitleLang", s.subtitleLang)
             .putBoolean("hideTorrents", s.hideUnsupported)
+            .putString("preferredQuality", s.preferredQuality)
+            .putString("streamSort", s.streamSort)
             .apply()
     }
 }

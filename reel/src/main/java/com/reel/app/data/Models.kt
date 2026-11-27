@@ -221,6 +221,8 @@ data class Stream(
     val sources: List<String>,
     val subtitles: List<Subtitle>,
     val headers: Map<String, String>,
+    /** File size in bytes when the add-on states it (behaviorHints.videoSize). */
+    val videoSize: Long? = null,
 ) {
     enum class Kind { Direct, YouTube, External, Torrent, Unsupported }
 
@@ -263,6 +265,7 @@ data class Stream(
                 sources = o.strList("sources"),
                 subtitles = (o["subtitles"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(Subtitle::parse) },
                 headers = headers,
+                videoSize = (hints?.get("videoSize") as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull()?.toLong(),
             )
         }
     }

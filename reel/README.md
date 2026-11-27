@@ -30,6 +30,9 @@ Build: `./gradlew :reel:assembleDebug` → `reel/build/outputs/apk/debug/reel-de
 
 **Playback**
 - Built-in player (HLS, DASH, MP4, …) with resume, add-on subtitles and a preferred subtitle language.
+- Sources are grouped into quality tabs (4K / 1080p / 720p / SD / Other) with counts. The list opens on your
+  default quality (1080p unless changed in Settings) and can be sorted by size or seeders. Each source shows its
+  quality, size and seeders at a glance.
 - One tap to open any stream in another player (VLC, MX Player, …), or make that the default.
 - "Up next" card when an episode ends.
 

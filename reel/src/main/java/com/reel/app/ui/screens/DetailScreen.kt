@@ -34,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -48,6 +49,8 @@ import androidx.compose.material.icons.rounded.Theaters
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -85,7 +88,10 @@ import com.reel.app.ReelApp
 import com.reel.app.data.LibraryRules
 import com.reel.app.data.Meta
 import com.reel.app.data.MetaPreview
+import com.reel.app.data.Quality
 import com.reel.app.data.Stream
+import com.reel.app.data.StreamSort
+import com.reel.app.data.StreamSorting
 import com.reel.app.data.StreamGroup
 import com.reel.app.data.Subtitle
 import com.reel.app.data.Video
@@ -391,26 +397,70 @@ private fun StreamsSheet(nav: NavController, meta: Meta, video: Video, onDismiss
                     EmptyState(Icons.Rounded.Extension, "No stream sources", "Your add-ons only provide catalogs. Install an add-on that provides streams in Settings → Add-ons.")
                     TextButton(onClick = { onDismiss(); nav.navigate("settings") }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Open add-ons") }
                 }
-                else -> LazyColumn(Modifier.fillMaxWidth().height(520.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
-                    g.forEach { group ->
-                        val streams = group.streams
-                            .filter { it.kind != Stream.Kind.Unsupported && !(settings.hideUnsupported && it.kind == Stream.Kind.Torrent) }
-                            .sortedBy { it.kind == Stream.Kind.Torrent } // directly playable sources first
-                        val hidden = group.streams.size - streams.size
-                        item(key = "h-${group.addonName}") {
-                            Text(
-                                group.addonName + when {
-                                    group.error != null -> " · couldn't reach it (${group.error})"
-                                    streams.isEmpty() && hidden > 0 -> " · $hidden torrent sources hidden (Settings)"
-                                    streams.isEmpty() -> " · nothing found for this title"
-                                    else -> " · ${streams.size}"
-                                },
-                                style = MaterialTheme.typography.labelSmall, color = ReelColors.Muted,
-                                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 4.dp),
-                            )
+                else -> {
+                    fun keep(st: Stream) = st.kind != Stream.Kind.Unsupported && !(settings.hideUnsupported && st.kind == Stream.Kind.Torrent)
+                    val counts = remember(g, settings.hideUnsupported) {
+                        g.flatMap { it.streams.filter(::keep) }.groupingBy { StreamSorting.info(it).quality }.eachCount()
+                    }
+                    val preferred = Quality.fromLabel(settings.preferredQuality)
+                    // null = all qualities
+                    var quality by remember(g) { mutableStateOf(StreamSorting.initialQuality(counts.keys, preferred)) }
+                    val sort = StreamSort.fromName(settings.streamSort)
+                    var sortMenu by remember { mutableStateOf(false) }
+
+                    Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        LazyRow(Modifier.weight(1f), contentPadding = PaddingValues(start = 20.dp, end = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            item { FilterChip(selected = quality == null, onClick = { quality = null }, label = { Text("All ${counts.values.sum()}") }) }
+                            items(Quality.entries.filter { (counts[it] ?: 0) > 0 }) { q ->
+                                FilterChip(
+                                    selected = quality == q,
+                                    onClick = { quality = q },
+                                    label = { Text("${q.label} ${counts[q]}") },
+                                    leadingIcon = if (q == preferred) ({ Icon(Icons.Rounded.Star, "Your default quality", Modifier.size(14.dp)) }) else null,
+                                )
+                            }
                         }
-                        items(streams.size, key = { "${group.addonName}-$it" }) { i ->
-                            StreamRow(streams[i], settings.externalPlayer, onPlay = { ext -> play(streams[i], ext) })
+                        Box {
+                            TextButton(onClick = { sortMenu = true }) {
+                                Icon(Icons.AutoMirrored.Rounded.Sort, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(sort.label, style = MaterialTheme.typography.labelLarge)
+                            }
+                            DropdownMenu(sortMenu, { sortMenu = false }) {
+                                StreamSort.entries.forEach { opt ->
+                                    DropdownMenuItem(
+                                        text = { Text(opt.label, color = if (opt == sort) ReelColors.Accent else ReelColors.Text) },
+                                        onClick = { app.settings.update { it.copy(streamSort = opt.name) }; sortMenu = false },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    LazyColumn(Modifier.fillMaxWidth().height(520.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
+                        g.forEach { group ->
+                            val playable = group.streams.filter(::keep)
+                            val streams = StreamSorting.sort(
+                                playable.filter { quality == null || StreamSorting.info(it).quality == quality }
+                                    .sortedBy { it.kind == Stream.Kind.Torrent }, // directly playable sources first
+                                sort,
+                            )
+                            val hidden = group.streams.size - playable.size
+                            item(key = "h-${group.addonName}") {
+                                Text(
+                                    group.addonName + when {
+                                        group.error != null -> " · couldn't reach it (${group.error})"
+                                        playable.isEmpty() && hidden > 0 -> " · $hidden torrent sources hidden (Settings)"
+                                        playable.isEmpty() -> " · nothing found for this title"
+                                        streams.isEmpty() -> " · none in ${quality?.label}"
+                                        else -> " · ${streams.size}"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall, color = ReelColors.Muted,
+                                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 4.dp),
+                                )
+                            }
+                            items(streams.size, key = { "${group.addonName}-${quality}-${sort}-$it" }) { i ->
+                                StreamRow(streams[i], settings.externalPlayer, onPlay = { ext -> play(streams[i], ext) })
+                            }
                         }
                     }
                 }
@@ -435,7 +485,14 @@ private fun StreamRow(s: Stream, preferExternal: Boolean, onPlay: (external: Boo
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(s.headline, maxLines = 1, overflow = TextOverflow.Ellipsis, color = if (supported) ReelColors.Text else ReelColors.Muted)
-            if (s.details.isNotEmpty()) Text(s.details, style = MaterialTheme.typography.bodySmall, color = ReelColors.Muted, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            val info = remember(s) { StreamSorting.info(s) }
+            val facts = listOfNotNull(
+                info.quality.takeIf { it != Quality.Unknown }?.label,
+                info.sizeBytes?.let(StreamSorting::formatSize),
+                info.seeders?.let { "$it seeders" },
+            )
+            if (facts.isNotEmpty()) Text(facts.joinToString("  ·  "), style = MaterialTheme.typography.labelSmall, color = ReelColors.Text)
+            if (s.details.isNotEmpty()) Text(s.details, style = MaterialTheme.typography.bodySmall, color = ReelColors.Muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (s.kind == Stream.Kind.Torrent) Text("Torrent · opens in another app", style = MaterialTheme.typography.labelSmall, color = ReelColors.Accent)
             if (!supported) Text("No playable link", style = MaterialTheme.typography.labelSmall, color = ReelColors.Muted)
         }
