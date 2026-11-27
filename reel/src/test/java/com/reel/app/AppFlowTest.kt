@@ -8,13 +8,11 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.printToString
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
-import com.github.takahirom.roborazzi.captureRoboImage
 import com.reel.app.data.Http
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -61,7 +59,12 @@ class TestReelApp : ReelApp() {
 class AppFlowTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
-    private fun shot(name: String) = rule.onRoot().captureRoboImage("build/outputs/roborazzi/$name.png")
+    /** Captures the whole screen, including bottom sheets and dialogs. */
+    @OptIn(com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)
+    private fun shot(name: String) {
+        rule.waitForIdle()
+        com.github.takahirom.roborazzi.captureScreenRoboImage("build/outputs/roborazzi/$name.png")
+    }
     private fun waitFor(text: String) {
         try {
             rule.waitUntil(5_000) { rule.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() }
