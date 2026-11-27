@@ -45,9 +45,8 @@ Build: `./gradlew :reel:assembleDebug` → `reel/build/outputs/apk/debug/reel-de
 Reel ships with one metadata add-on (Cinemeta: posters, details and episodes). It has **no stream
 sources built in**: to play something, install an add-on that provides streams for content you are
 allowed to watch, such as your own media server or free/public-domain sources.
-Torrent (`infoHash`) sources are listed too: tapping one opens it as a magnet link in another installed
-app (Stremio, a torrent client, …), because Reel's own player only plays direct links. Add-ons set up with a
-debrid service return direct links, which play inside Reel. Torrent sources can be hidden in Settings.
+Only sources Reel can open itself are listed (direct video links, YouTube, web links). Torrent sources are
+not supported and are not shown.
 
 ## Code map
 

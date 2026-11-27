@@ -12,8 +12,6 @@ data class Settings(
     val autoplayNext: Boolean = true,
     /** Preferred subtitle language (ISO 639-2, e.g. "eng"), empty = off. */
     val subtitleLang: String = "",
-    /** Hide torrent sources (they open in another app, not in Reel's player). */
-    val hideUnsupported: Boolean = false,
     /** Quality tab the source list opens on ("1080p", "4K", ...). */
     val preferredQuality: String = "1080p",
     /** How sources are ordered (a [StreamSort] name). */
@@ -27,7 +25,6 @@ class SettingsRepository(context: Context) {
             externalPlayer = prefs.getBoolean("externalPlayer", false),
             autoplayNext = prefs.getBoolean("autoplayNext", true),
             subtitleLang = prefs.getString("subtitleLang", "") ?: "",
-            hideUnsupported = prefs.getBoolean("hideTorrents", false),
             preferredQuality = prefs.getString("preferredQuality", "1080p") ?: "1080p",
             streamSort = prefs.getString("streamSort", "Default") ?: "Default",
         )
@@ -41,7 +38,6 @@ class SettingsRepository(context: Context) {
             .putBoolean("externalPlayer", s.externalPlayer)
             .putBoolean("autoplayNext", s.autoplayNext)
             .putString("subtitleLang", s.subtitleLang)
-            .putBoolean("hideTorrents", s.hideUnsupported)
             .putString("preferredQuality", s.preferredQuality)
             .putString("streamSort", s.streamSort)
             .apply()

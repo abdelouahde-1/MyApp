@@ -39,7 +39,7 @@ object FakeAddon : Http {
         url.contains("/meta/series/tt200") -> """{"meta":{"id":"tt200","type":"series","name":"The Long Road","releaseInfo":"2019–","imdbRating":"8.4","genres":["Drama","Mystery"],
             "description":"Two strangers drive across a continent and slowly find out why they were both invited.","runtime":"52 min","cast":["A. Actor","B. Actor"],"videos":[$episodes]}}"""
         url.contains("/meta/") -> """{"meta":{"id":"tt101","type":"movie","name":"Movie 1","releaseInfo":"2021","description":"A movie."}}"""
-        url.contains("/stream/") -> """{"streams":[{"name":"Sample 1080p","title":"Open demo video\n💾 1.2 GB","url":"https://example.com/demo.mp4"},{"name":"Sample\n720p","title":"Small.720p.mkv\n👤 5 💾 700 MB","infoHash":"abc"},{"name":"Sample\n4k","title":"Big.2160p.mkv\n👤 9 💾 15 GB","infoHash":"def"}]}"""
+        url.contains("/stream/") -> """{"streams":[{"name":"Sample 1080p","title":"Open demo video\n💾 1.2 GB","url":"https://example.com/demo.mp4"},{"name":"Sample\n720p","title":"Small.720p.mkv\n💾 700 MB","url":"https://example.com/small.mp4"},{"name":"Sample\n4k","title":"Big.2160p.mkv\n💾 15 GB","url":"https://example.com/big.mp4"},{"name":"Torrent only","title":"Hidden.mkv","infoHash":"abc"}]}"""
         else -> "{}"
     }
 }

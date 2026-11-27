@@ -217,31 +217,19 @@ data class Stream(
     val ytId: String?,
     val externalUrl: String?,
     val infoHash: String?,
-    /** Torrent trackers / peer sources ("tracker:udp://…", "dht:…"). */
-    val sources: List<String>,
     val subtitles: List<Subtitle>,
     val headers: Map<String, String>,
     /** File size in bytes when the add-on states it (behaviorHints.videoSize). */
     val videoSize: Long? = null,
 ) {
-    enum class Kind { Direct, YouTube, External, Torrent, Unsupported }
+    enum class Kind { Direct, YouTube, External, Unsupported }
 
     val kind: Kind
         get() = when {
             url != null -> Kind.Direct
             ytId != null -> Kind.YouTube
             externalUrl != null -> Kind.External
-            infoHash != null -> Kind.Torrent
             else -> Kind.Unsupported
-        }
-
-    /** Magnet link for torrent sources, so another app (a torrent client or player) can open it. */
-    val magnet: String?
-        get() = infoHash?.let { hash ->
-            val dn = java.net.URLEncoder.encode(details.lines().firstOrNull()?.ifBlank { null } ?: headline, "UTF-8")
-            val trackers = sources.filter { it.startsWith("tracker:") }
-                .joinToString("") { "&tr=" + java.net.URLEncoder.encode(it.removePrefix("tracker:"), "UTF-8") }
-            "magnet:?xt=urn:btih:$hash&dn=$dn$trackers"
         }
 
     /** Short label (add-ons usually put source + quality in `name`). */
@@ -262,7 +250,6 @@ data class Stream(
                 ytId = o.str("ytId"),
                 externalUrl = o.str("externalUrl"),
                 infoHash = o.str("infoHash"),
-                sources = o.strList("sources"),
                 subtitles = (o["subtitles"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(Subtitle::parse) },
                 headers = headers,
                 videoSize = (hints?.get("videoSize") as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull()?.toLong(),
